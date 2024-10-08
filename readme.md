@@ -14,8 +14,8 @@ A simple Go project to scrape and track profile statistics (rank, upload, downlo
 1. Clone the repo:
 
     ```bash
-    git clone https://github.com/skidoodle/ncore-profile-tracker.git
-    cd ncore-profile-tracker
+    git clone https://github.com/skidoodle/trackncore.git
+    cd trackncore
     ```
 
 2. Create a `.env` file with your nCore credentials and profile URLs:
