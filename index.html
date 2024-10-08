@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>nCore Profile Stats</title>
+    <script src="//cdn.tailwindcss.com"></script>
+    <script src="//unpkg.com/boxicons"></script>
+    <style>
+        body {
+            background-color: #121212;
+            color: #efefef;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        #historyModal {
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        #historyModal.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #historyModal.visible {
+            opacity: 1;
+        }
+
+        #profiles {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        @media (min-width: 768px) {
+            #profiles {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (min-width: 1024px) {
+            #profiles {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        .profile-card {
+            flex: 0 1 calc(100% - 2rem);
+            max-width: 400px;
+            background-color: #1f1f1f;
+            color: #e5e5e5;
+        }
+
+        .profile-card button {
+            background-color: #3b3b3b;
+            color: #ffffff;
+        }
+
+        .profile-card button:hover {
+            background-color: #5b5b5b;
+        }
+
+        #historyModal .bg-gray-800 {
+            background-color: #2c2c2c;
+            color: #ffffff;
+        }
+
+        #historyModal button {
+            background-color: #444444;
+        }
+
+        #historyModal button:hover {
+            background-color: #666666;
+        }
+
+        .tab-button {
+            background-color: #444444;
+            color: #ffffff;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+        }
+
+        .tab-button.active {
+            background-color: #ff5722;
+        }
+
+        .tab-content {
+            display: none;
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 1rem;
+            background-color: #333333;
+            border-radius: 0.375rem;
+            margin-top: 1rem;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .button-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        @media (max-width: 640px) {
+            #historyModal .bg-gray-800 {
+                padding: 1.5rem;
+                width: 90%;
+            }
+        }
+    </style>
+</head>
+<body class="p-8 flex flex-col items-center">
+    <h1 class="text-4xl mb-10 font-semibold text-gray-100 text-center">nCore Profile Stats</h1>
+
+    <div id="profiles" class="w-full max-w-7xl"></div>
+
+    <div id="historyModal" class="fixed inset-0 hidden bg-black bg-opacity-50 flex items-center justify-center z-50" aria-hidden="true" aria-modal="true" tabindex="-1">
+        <div class="bg-gray-800 rounded-lg p-8 w-11/12 max-w-3xl text-white shadow-lg relative">
+            <h2 class="text-2xl mb-6 font-semibold" id="modal-profile-name">Historical Data for <span></span></h2>
+
+            <div class="button-container mb-4">
+                <button class="tab-button active" onclick="openTab(event, 'rankTab')">Rank</button>
+                <button class="tab-button" onclick="openTab(event, 'uploadTab')">Upload</button>
+                <button class="tab-button" onclick="openTab(event, 'downloadTab')">Download</button>
+                <button class="tab-button" onclick="openTab(event, 'pointsTab')">Points</button>
+            </div>
+
+            <div id="rankTab" class="tab-content active">
+                <p id="rank-data"></p>
+            </div>
+            <div id="uploadTab" class="tab-content">
+                <p id="upload-data"></p>
+            </div>
+            <div id="downloadTab" class="tab-content">
+                <p id="download-data"></p>
+            </div>
+            <div id="pointsTab" class="tab-content">
+                <p id="points-data"></p>
+            </div>
+
+            <button class="mt-4 px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded" onclick="closeModal()">Close</button>
+            <button class="absolute top-2 right-2 text-white" onclick="closeModal()"><i class='bx bx-x text-2xl'></i></button>
+        </div>
+    </div>
+
+    <script>
+        let allProfileData = [];
+
+        async function fetchProfiles() {
+            const response = await fetch('/data');
+            allProfileData = await response.json();
+
+            const profilesDiv = document.getElementById('profiles');
+            profilesDiv.innerHTML = '';
+
+            const profileGroups = groupByOwner(allProfileData);
+
+            for (const [owner, records] of Object.entries(profileGroups)) {
+                const latestRecord = records[records.length - 1];
+                const profileCard = document.createElement('div');
+                profileCard.classList.add('profile-card', 'rounded-lg', 'shadow-lg', 'p-6', 'w-full', 'flex', 'flex-col', 'justify-between');
+
+                profileCard.innerHTML = `
+                    <h2 class="text-2xl font-semibold mb-4"><i class='bx bxs-user text-2xl mr-2'></i>${owner}</h2>
+                    <div class="space-y-2">
+                        <p><i class='bx bx-trophy mr-2'></i> Rank: ${latestRecord.rank}</p>
+                        <p><i class='bx bx-cloud-upload mr-2'></i> Upload: ${latestRecord.upload}</p>
+                        <p><i class='bx bx-upload mr-2'></i> Current Upload: ${latestRecord.current_upload}</p>
+                        <p><i class='bx bx-download mr-2'></i> Current Download: ${latestRecord.current_download}</p>
+                        <p><i class='bx bx-coin mr-2'></i> Points: ${latestRecord.points}</p>
+                    </div>
+                    <button class="mt-6 px-4 py-2 text-white rounded" onclick="showHistory('${owner}', event)">View History</button>
+                `;
+
+                profilesDiv.appendChild(profileCard);
+            }
+        }
+
+        function groupByOwner(data) {
+            return data.reduce((acc, record) => {
+                acc[record.owner] = acc[record.owner] || [];
+                acc[record.owner].push(record);
+                return acc;
+            }, {});
+        }
+
+        function showHistory(owner, event) {
+            event.stopPropagation();
+            const historyModal = document.getElementById('historyModal');
+            document.getElementById('modal-profile-name').innerText = owner;
+
+            const profileHistory = allProfileData.filter(record => record.owner === owner);
+
+            document.getElementById('rank-data').innerHTML = profileHistory.map(record => `<p>${new Date(record.timestamp).toLocaleDateString()} - Rank: ${record.rank}</p>`).join('');
+            document.getElementById('upload-data').innerHTML = profileHistory.map(record => `<p>${new Date(record.timestamp).toLocaleDateString()} - Upload: ${record.upload}</p>`).join('');
+            document.getElementById('download-data').innerHTML = profileHistory.map(record => `<p>${new Date(record.timestamp).toLocaleDateString()} - Download: ${record.current_download}</p>`).join('');
+            document.getElementById('points-data').innerHTML = profileHistory.map(record => `<p>${new Date(record.timestamp).toLocaleDateString()} - Points: ${record.points}</p>`).join('');
+
+            historyModal.classList.remove('hidden');
+            setTimeout(() => historyModal.classList.add('visible'), 10);
+        }
+
+        function openTab(evt, tabName) {
+            document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            evt.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        function closeModal() {
+            const historyModal = document.getElementById('historyModal');
+            historyModal.classList.remove('visible');
+            historyModal.classList.add('hidden');
+        }
+
+        fetchProfiles();
+    </script>
+</body>
+</html>
