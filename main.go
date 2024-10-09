@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/joho/godotenv"
 )
 
 type ProfileData struct {
@@ -33,10 +32,6 @@ var (
 )
 
 func init() {
-	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
 	nick = os.Getenv("NICK")
 	pass = os.Getenv("PASS")
 
