@@ -41,7 +41,6 @@ To deploy the project using Docker Compose:
 1. Create the following `docker-compose.yml` file:
 
     ```yaml
-    version: "3"
     services:
       trackncore:
         image: ghcr.io/skidoodle/trackncore:main
@@ -49,11 +48,9 @@ To deploy the project using Docker Compose:
         restart: unless-stopped
         ports:
           - "3000:3000"
-        env_file:
-          - .env
         volumes:
-          - data:/app
-
+          - data:/app/data
+    
     volumes:
       data:
     ```
