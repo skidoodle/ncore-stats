@@ -7,45 +7,57 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/joho/godotenv"
 )
 
 type ProfileData struct {
-	Owner          string    `json:"owner"`
-	Timestamp      time.Time `json:"timestamp"`
-	Rank           string    `json:"rank"`
-	Upload         string    `json:"upload"`
-	CurrentUpload  string    `json:"current_upload"`
-	CurrentDownload string   `json:"current_download"`
-	Points         string    `json:"points"`
+	Owner           string    `json:"owner"`
+	Timestamp       time.Time `json:"timestamp"`
+	Rank            string    `json:"rank"`
+	Upload          string    `json:"upload"`
+	CurrentUpload   string    `json:"current_upload"`
+	CurrentDownload string    `json:"current_download"`
+	Points          string    `json:"points"`
 }
 
 var (
 	profiles = map[string]string{}
-	jsonFile = "data.json"
+	jsonFile = "./data/data.json"
+	profilesFile = "profiles.json"
+	baseUrl  = "https://ncore.pro/profile.php?id="
 	nick     string
 	pass     string
 	client   *http.Client
 )
 
 func init() {
+	godotenv.Load()
+
 	nick = os.Getenv("NICK")
 	pass = os.Getenv("PASS")
 
-	for i := 1; i <= 10; i++ {
-		profileKey := fmt.Sprintf("PROFILE_%d", i)
-		if profileURL := os.Getenv(profileKey); profileURL != "" {
-			profiles[profileURL] = profileURL
-		}
+	file, err := os.Open(profilesFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	jsonBytes, _ := io.ReadAll(file)
+
+	var tempProfiles map[string]string = make(map[string]string)
+	json.Unmarshal(jsonBytes, &tempProfiles)
+
+	for k, v := range tempProfiles {
+		profiles[k] = baseUrl + v
 	}
 
 	client = &http.Client{}
 }
 
-func fetchProfile(url string) (*ProfileData, error) {
+func fetchProfile(url string, displayName string) (*ProfileData, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -57,10 +69,11 @@ func fetchProfile(url string) (*ProfileData, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to fetch profile: %s", url)
+		return nil, fmt.Errorf("failed to fetch profile: %s", displayName)
 	}
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
@@ -68,11 +81,8 @@ func fetchProfile(url string) (*ProfileData, error) {
 		return nil, err
 	}
 
-	owner := strings.TrimSpace(doc.Find(".fobox_fej").Text())
-	owner = strings.Replace(owner, " profilja", "", 1)
-
 	profile := &ProfileData{
-		Owner:     owner,
+		Owner:     displayName,
 		Timestamp: time.Now(),
 	}
 
@@ -108,10 +118,10 @@ func readExistingProfiles() ([]ProfileData, error) {
 	}
 	defer file.Close()
 
-	var profiles []ProfileData
+	var existingProfiles []ProfileData
 	byteValue, _ := io.ReadAll(file)
-	err = json.Unmarshal(byteValue, &profiles)
-	return profiles, err
+	err = json.Unmarshal(byteValue, &existingProfiles)
+	return existingProfiles, err
 }
 
 func logToJSON(profile *ProfileData) error {
@@ -134,14 +144,14 @@ func logToJSON(profile *ProfileData) error {
 }
 
 func dataHandler(w http.ResponseWriter, r *http.Request) {
-	profiles, err := readExistingProfiles()
+	existingProfiles, err := readExistingProfiles()
 	if err != nil {
 		http.Error(w, "Could not read data", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(profiles)
+	json.NewEncoder(w).Encode(existingProfiles)
 }
 
 func serveHTML(w http.ResponseWriter, r *http.Request) {
@@ -149,13 +159,13 @@ func serveHTML(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	ticker := time.NewTicker(24 * time.Hour)
+	ticker := time.NewTicker(time.Minute * 30)
 	defer ticker.Stop()
 
 	go func() {
 		for {
-			for _, url := range profiles {
-				profile, err := fetchProfile(url)
+			for displayName, url := range profiles {
+				profile, err := fetchProfile(url, displayName)
 				if err != nil {
 					log.Println(err)
 					continue
