@@ -18,12 +18,20 @@ A simple Go project to scrape and track profile statistics (rank, upload, downlo
     cd trackncore
     ```
 
-2. Create a `.env` file with your nCore credentials and profile URLs:
+2. Create a `.env` file with your nCore credentials:
 
     ```bash
     NICK=your_nick
     PASS=your_password
-    PROFILE_1=https://ncore.pro/profile.php?id=1577943
+    ```
+
+3. Add the `profiles.json` file, which contains your profile IDs:
+
+    ```json
+    {
+      "alice": "69",
+      "bob": "420"
+    }
     ```
 
 ### How to obtain `NICK` and `PASS`
