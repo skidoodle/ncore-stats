@@ -25,7 +25,8 @@ type ProfileData struct {
 
 var (
 	profiles = map[string]string{}
-	jsonFile = "data.json"
+	jsonFile = "./data/data.json"
+	profilesFile = "profiles.json"
 	baseUrl  = "https://ncore.pro/profile.php?id="
 	nick     string
 	pass     string
@@ -38,7 +39,7 @@ func init() {
 	nick = os.Getenv("NICK")
 	pass = os.Getenv("PASS")
 
-	file, err := os.Open("profiles.json")
+	file, err := os.Open(profilesFile)
 	if err != nil {
 		log.Fatal(err)
 	}

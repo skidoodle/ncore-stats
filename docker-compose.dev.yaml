@@ -1,6 +1,6 @@
 services:
   trackncore:
-    image: ghcr.io/skidoodle/trackncore:main
+    build: .
     container_name: trackncore
     restart: unless-stopped
     ports:
