@@ -7,6 +7,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -16,21 +19,22 @@ import (
 type ProfileData struct {
 	Owner           string    `json:"owner"`
 	Timestamp       time.Time `json:"timestamp"`
-	Rank            string    `json:"rank"`
+	Rank            int       `json:"rank"`
 	Upload          string    `json:"upload"`
 	CurrentUpload   string    `json:"current_upload"`
 	CurrentDownload string    `json:"current_download"`
-	Points          string    `json:"points"`
+	Points          int       `json:"points"`
+	SeedingCount   int        `json:"seeding_count"`
 }
 
 var (
-	profiles = map[string]string{}
-	jsonFile = "./data/data.json"
+	profiles     = map[string]string{}
+	jsonFile     = "./data/data.json"
 	profilesFile = "profiles.json"
-	baseUrl  = "https://ncore.pro/profile.php?id="
-	nick     string
-	pass     string
-	client   *http.Client
+	baseUrl      = "https://ncore.pro/profile.php?id="
+	nick         string
+	pass         string
+	client       *http.Client
 )
 
 func init() {
@@ -93,7 +97,11 @@ func fetchProfile(url string, displayName string) (*ProfileData, error) {
 
 		switch label {
 		case "Helyezés:":
-			profile.Rank = value
+			value = strings.TrimSuffix(value, ".")
+			rank, err := strconv.Atoi(value)
+			if err == nil {
+				profile.Rank = rank
+			}
 		case "Feltöltés:":
 			profile.Upload = value
 		case "Aktuális feltöltés:":
@@ -101,7 +109,19 @@ func fetchProfile(url string, displayName string) (*ProfileData, error) {
 		case "Aktuális letöltés:":
 			profile.CurrentDownload = value
 		case "Pontok száma:":
-			profile.Points = value
+			points, err := strconv.Atoi(value)
+			if err == nil {
+				profile.Points = points
+			}
+		}
+	})
+
+	doc.Find(".lista_mini_fej").Each(func(i int, s *goquery.Selection) {
+		text := s.Text()
+		re := regexp.MustCompile(`\((\d+)\)`)
+		matches := re.FindStringSubmatch(text)
+		if len(matches) > 1 {
+			fmt.Sscanf(matches[1], "%d", &profile.SeedingCount)
 		}
 	})
 

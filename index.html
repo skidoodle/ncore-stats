@@ -151,16 +151,17 @@
           )
 
           profileCard.innerHTML = `
-                    <h2 class="text-2xl font-semibold mb-4"><i class='bx bxs-user text-2xl mr-2'></i>${owner}</h2>
-                    <div class="space-y-2">
-                        <p><i class='bx bx-trophy mr-2'></i> Rank: ${latestRecord.rank}</p>
-                        <p><i class='bx bx-cloud-upload mr-2'></i> Upload: ${latestRecord.upload}</p>
-                        <p><i class='bx bx-upload mr-2'></i> Current Upload: ${latestRecord.current_upload}</p>
-                        <p><i class='bx bx-download mr-2'></i> Current Download: ${latestRecord.current_download}</p>
-                        <p><i class='bx bx-coin mr-2'></i> Points: ${latestRecord.points}</p>
-                    </div>
-                    <button class="mt-6 px-4 py-2 text-white rounded" onclick="showHistory('${owner}', event)">View History</button>
-                `
+            <h2 class="text-2xl font-semibold mb-4"><i class='bx bxs-user text-2xl mr-2'></i>${owner}</h2>
+            <div class="space-y-2">
+                <p><i class='bx bx-trophy mr-2'></i> Rank: ${latestRecord.rank}</p>
+                <p><i class='bx bx-cloud-upload mr-2'></i> Upload: ${latestRecord.upload}</p>
+                <p><i class='bx bx-upload mr-2'></i> Current Upload: ${latestRecord.current_upload}</p>
+                <p><i class='bx bx-download mr-2'></i> Current Download: ${latestRecord.current_download}</p>
+                <p><i class='bx bx-coin mr-2'></i> Points: ${latestRecord.points}</p>
+                <p><i class='bx bx-folder mr-2'></i> Seeding Count: ${latestRecord.seeding_count}</p>
+            </div>
+            <button class="mt-6 px-4 py-2 text-white rounded" onclick="showHistory('${owner}', event)">View History</button>
+          `
 
           profilesDiv.appendChild(profileCard)
         }
@@ -201,7 +202,7 @@
         const labels = profileHistory.map(record =>
           new Date(record.timestamp).toLocaleDateString()
         )
-        const rankData = profileHistory.map(record => parseFloat(record.rank))
+        const rankData = profileHistory.map(record => record.rank)
         const uploadData = profileHistory.map(record =>
           parseStorageValue(record.upload)
         )
@@ -211,9 +212,9 @@
         const downloadData = profileHistory.map(record =>
           parseSpeedValue(record.current_download)
         )
-        const pointsData = profileHistory.map(record =>
-          parseFloat(record.points)
-        )
+        const pointsData = profileHistory.map(record => record.points)
+
+        const seedingCount = profileHistory.map(record => record.seeding_count)
 
         const chartData = {
           labels: labels,
@@ -246,6 +247,12 @@
               label: 'Points',
               data: pointsData,
               borderColor: 'rgba(153, 102, 255, 1)',
+              fill: false,
+            },
+            {
+              label: 'Seeding Count',
+              data: seedingCount,
+              borderColor: 'rgba(255, 159, 64, 1)',
               fill: false,
             },
           ],
