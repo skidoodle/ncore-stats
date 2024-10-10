@@ -34,6 +34,7 @@ var (
 )
 
 func init() {
+	_ = godotenv.Load(".env.local")
 	godotenv.Load()
 
 	nick = os.Getenv("NICK")
