@@ -180,7 +180,7 @@ func serveHTML(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	ticker := time.NewTicker(time.Minute * 30)
+	ticker := time.NewTicker(time.Hour * 24)
 	defer ticker.Stop()
 
 	go func() {
