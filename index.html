@@ -65,6 +65,7 @@
       #historyModal .bg-gray-800 {
         background-color: #2c2c2c;
         color: #ffffff;
+        overflow-y: auto;
       }
 
       #historyModal button {
@@ -87,6 +88,10 @@
           width: 90%;
         }
       }
+
+      #historyChart {
+        height: 300px;
+      }
     </style>
   </head>
   <body class="p-8 flex flex-col items-center">
@@ -98,18 +103,14 @@
 
     <div
       id="historyModal"
-      class="fixed inset-0 hidden bg-black bg-opacity-50 flex items-center justify-center z-50"
+      class="fixed inset-0 hidden bg-black bg-opacity-50 flex items-center justify-center z-50 mt-6"
       aria-hidden="true"
       aria-modal="true"
       tabindex="-1">
       <div
         class="bg-gray-800 rounded-lg p-8 w-11/12 max-w-3xl text-white shadow-lg relative">
-        <h2 class="text-2xl mb-6 font-semibold" id="modal-profile-name">
-          Historical Data for <span></span>
-        </h2>
-
-        <canvas id="historyChart" width="330px" height="300px"></canvas>
-
+        <h2 class="text-2xl mb-6 font-semibold" id="modal-profile-name"></h2>
+        <canvas id="historyChart" height="250"></canvas>
         <button
           class="mt-4 px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
           onclick="closeModal()">
