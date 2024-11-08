@@ -188,7 +188,13 @@
       }
 
       function parseSpeedValue(value) {
-        return parseFloat(value).toFixed(2)
+        if (value.includes('KiB')) {
+          return (parseFloat(value) / 1024).toFixed(2)
+        } else if (value.includes('MiB')) {
+          return parseFloat(value).toFixed(2)
+        } else {
+          return parseFloat(value).toFixed(2)
+        }
       }
 
       function showHistory(owner, event) {
