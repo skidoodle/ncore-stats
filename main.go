@@ -237,7 +237,7 @@ func watchProfilesFile() {
 			}
 			if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Create == fsnotify.Create {
 				log.Println("Profiles file changed, reloading profiles...")
-				debounce.Stop() // Stop any running debounce timer
+				debounce.Stop()
 				debounce = time.AfterFunc(500*time.Millisecond, func() {
 					loadProfiles()
 					for displayName, url := range profiles {
