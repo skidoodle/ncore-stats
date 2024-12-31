@@ -1,7 +1,7 @@
 services:
-  trackncore:
+  ncore-stats:
     build: .
-    container_name: trackncore
+    container_name: ncore-stats
     restart: unless-stopped
     ports:
       - "3000:3000"

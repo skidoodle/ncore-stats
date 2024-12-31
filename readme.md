@@ -14,8 +14,8 @@ A simple Go project to scrape and track profile statistics (rank, upload, downlo
 1. Clone the repo:
 
     ```bash
-    git clone https://github.com/skidoodle/trackncore.git
-    cd trackncore
+    git clone https://github.com/skidoodle/ncore-stats.git
+    cd ncore-stats
     ```
 
 2. Create a `.env` file with your nCore credentials:
@@ -50,15 +50,15 @@ To deploy the project using Docker Compose:
 
     ```yaml
     services:
-      trackncore:
-        image: ghcr.io/skidoodle/trackncore:main
-        container_name: trackncore
+      ncore-stats:
+        image: ghcr.io/skidoodle/ncore-stats:main
+        container_name: ncore-stats
         restart: unless-stopped
         ports:
           - "3000:3000"
         volumes:
           - data:/app/data
-    
+
     volumes:
       data:
     ```
