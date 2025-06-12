@@ -8,313 +8,122 @@
     <script src="//unpkg.com/boxicons"></script>
     <script src="//unpkg.com/chart.js"></script>
     <style>
-      body {
-        background-color: #121212;
-        color: #efefef;
-        font-family: 'Roboto', sans-serif;
-      }
-
-      #historyModal {
-        transition: opacity 0.3s ease-in-out;
-      }
-
-      #historyModal.hidden {
-        opacity: 0;
-        pointer-events: none;
-      }
-
-      #historyModal.visible {
-        opacity: 1;
-      }
-
-      #profiles {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 1rem;
-        justify-content: center;
-      }
-
-      @media (min-width: 768px) {
-        #profiles {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-      }
-
-      @media (min-width: 1024px) {
-        #profiles {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-      }
-
-      .profile-card {
-        flex: 0 1 calc(100% - 2rem);
-        max-width: 400px;
-        background-color: #1f1f1f;
-        color: #e5e5e5;
-      }
-
-      .profile-card button {
-        background-color: #3b3b3b;
-        color: #ffffff;
-      }
-
-      .profile-card button:hover {
-        background-color: #5b5b5b;
-      }
-
-      #historyModal .bg-gray-800 {
-        background-color: #2c2c2c;
-        color: #ffffff;
-        overflow-y: auto;
-      }
-
-      #historyModal button {
-        background-color: #444444;
-      }
-
-      #historyModal button:hover {
-        background-color: #666666;
-      }
-
-      .button-container {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 1rem;
-      }
-
-      @media (max-width: 640px) {
-        #historyModal .bg-gray-800 {
-          padding: 1.5rem;
-          width: 90%;
-        }
-      }
-
-      #historyChart {
-        height: 300px;
-      }
+      body { background-color: #121212; color: #efefef; font-family: 'Roboto', sans-serif; }
+      #historyModal { transition: opacity 0.3s ease-in-out; }
+      #historyModal.hidden { opacity: 0; pointer-events: none; }
+      #historyModal.visible { opacity: 1; }
+      #profiles { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; }
+      .profile-card { flex: 0 1 calc(100% - 2rem); max-width: 400px; background-color: #1f1f1f; color: #e5e5e5; }
+      .profile-card button { background-color: #3b3b3b; color: #ffffff; }
+      .profile-card button:hover { background-color: #5b5b5b; }
+      #historyModal .bg-gray-800 { background-color: #2c2c2c; color: #ffffff; overflow-y: auto; }
+      #historyModal button { background-color: #444444; }
+      #historyModal button:hover { background-color: #666666; }
     </style>
   </head>
   <body class="p-8 flex flex-col items-center">
-    <h1 class="text-4xl mb-10 font-semibold text-gray-100 text-center">
-      nCore Profile Stats
-    </h1>
-
+    <h1 class="text-4xl mb-10 font-semibold text-gray-100 text-center">nCore Profile Stats</h1>
     <div id="profiles" class="w-full max-w-7xl"></div>
-
-    <div
-      id="historyModal"
-      class="fixed inset-0 hidden bg-black bg-opacity-50 flex items-center justify-center z-50 mt-6"
-      aria-hidden="true"
-      aria-modal="true"
-      tabindex="-1">
-      <div
-        class="bg-gray-800 rounded-lg p-8 w-11/12 max-w-3xl text-white shadow-lg relative">
+    <div id="historyModal" class="fixed inset-0 hidden bg-black bg-opacity-50 flex items-center justify-center z-50 mt-6">
+      <div class="bg-gray-800 rounded-lg p-8 w-11/12 max-w-3xl text-white shadow-lg relative">
         <h2 class="text-2xl mb-6 font-semibold" id="modal-profile-name"></h2>
         <canvas id="historyChart" height="250"></canvas>
-        <button
-          class="mt-4 px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
-          onclick="closeModal()">
-          Close
-        </button>
-        <button
-          class="absolute top-2 right-2 text-white"
-          onclick="closeModal()">
-          <i class="bx bx-x text-2xl"></i>
-        </button>
+        <button class="mt-4 px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded" onclick="closeModal()">Close</button>
+        <button class="absolute top-2 right-2 text-white" onclick="closeModal()"><i class="bx bx-x text-2xl"></i></button>
       </div>
     </div>
 
     <script>
-      let allProfileData = []
-      let historyChart
+      let historyChart;
 
+      // Fetches only the LATEST data for each profile for a fast initial load.
       async function fetchProfiles() {
-        const response = await fetch('/data')
-        allProfileData = await response.json()
+        const response = await fetch('/api/profiles');
+        const latestRecords = await response.json();
 
-        const profilesDiv = document.getElementById('profiles')
-        profilesDiv.innerHTML = ''
+        const profilesDiv = document.getElementById('profiles');
+        profilesDiv.innerHTML = '';
 
-        const profileGroups = groupByOwner(allProfileData)
-
-        for (const [owner, records] of Object.entries(profileGroups)) {
-          const latestRecord = records[records.length - 1]
-          const profileCard = document.createElement('div')
-          profileCard.classList.add(
-            'profile-card',
-            'rounded-lg',
-            'shadow-lg',
-            'p-6',
-            'w-full',
-            'flex',
-            'flex-col',
-            'justify-between'
-          )
+        for (const latestRecord of latestRecords) {
+          const profileCard = document.createElement('div');
+          profileCard.classList.add('profile-card', 'rounded-lg', 'shadow-lg', 'p-6', 'w-full', 'flex', 'flex-col', 'justify-between');
 
           profileCard.innerHTML = `
-            <h2 class="text-2xl font-semibold mb-4"><i class='bx bxs-user text-2xl mr-2'></i>${owner}</h2>
-            <div class="space-y-2">
-                <p><i class='bx bx-trophy mr-2'></i> Rank: ${latestRecord.rank}</p>
-                <p><i class='bx bx-cloud-upload mr-2'></i> Upload: ${latestRecord.upload}</p>
-                <p><i class='bx bx-upload mr-2'></i> Current Upload: ${latestRecord.current_upload}</p>
-                <p><i class='bx bx-download mr-2'></i> Current Download: ${latestRecord.current_download}</p>
-                <p><i class='bx bx-coin mr-2'></i> Points: ${latestRecord.points}</p>
-                <p><i class='bx bx-folder mr-2'></i> Seeding Count: ${latestRecord.seeding_count}</p>
+            <div>
+              <h2 class="text-2xl font-semibold mb-4"><i class='bx bxs-user text-2xl mr-2'></i>${latestRecord.owner}</h2>
+              <div class="space-y-2">
+                  <p><i class='bx bx-trophy mr-2'></i> Rank: ${latestRecord.rank}</p>
+                  <p><i class='bx bx-cloud-upload mr-2'></i> Upload: ${latestRecord.upload}</p>
+                  <p><i class='bx bx-upload mr-2'></i> Current Upload: ${latestRecord.current_upload}</p>
+                  <p><i class='bx bx-download mr-2'></i> Current Download: ${latestRecord.current_download}</p>
+                  <p><i class='bx bx-coin mr-2'></i> Points: ${latestRecord.points}</p>
+                  <p><i class='bx bx-folder mr-2'></i> Seeding Count: ${latestRecord.seeding_count}</p>
+              </div>
             </div>
-            <button class="mt-6 px-4 py-2 text-white rounded" onclick="showHistory('${owner}', event)">View History</button>
-          `
-
-          profilesDiv.appendChild(profileCard)
+            <button class="mt-6 px-4 py-2 text-white rounded" onclick="showHistory('${latestRecord.owner}', event)">View History</button>
+          `;
+          profilesDiv.appendChild(profileCard);
         }
       }
 
-      function groupByOwner(data) {
-        return data.reduce((acc, record) => {
-          acc[record.owner] = acc[record.owner] || []
-          acc[record.owner].push(record)
-          return acc
-        }, {})
-      }
+      // Fetches and displays the history for a SINGLE profile ON DEMAND.
+      async function showHistory(owner, event) {
+        event.stopPropagation();
+        const historyModal = document.getElementById('historyModal');
+        document.getElementById('modal-profile-name').innerText = `History for ${owner}`;
 
-      function parseStorageValue(value) {
-        const numericValue = parseFloat(value)
-        if (value.includes('TiB')) {
-          return numericValue.toFixed(2)
-        } else if (value.includes('GiB')) {
-          return (numericValue / 1024).toFixed(2)
-        } else {
-          return numericValue.toFixed(2)
+        // Fetch history for this specific user from the new API endpoint
+        const response = await fetch(`/api/history?owner=${encodeURIComponent(owner)}`);
+        const profileHistory = await response.json();
+
+        if (!profileHistory || profileHistory.length === 0) {
+            alert('No history data found for this user.');
+            return;
         }
-      }
 
-      function parseSpeedValue(value) {
-        if (value.includes('KiB')) {
-          return (parseFloat(value) / 1024).toFixed(2)
-        } else if (value.includes('MiB')) {
-          return parseFloat(value).toFixed(2)
-        } else {
-          return parseFloat(value).toFixed(2)
-        }
-      }
-
-      function showHistory(owner, event) {
-        event.stopPropagation()
-        const historyModal = document.getElementById('historyModal')
-        document.getElementById('modal-profile-name').innerText = owner
-
-        const profileHistory = allProfileData.filter(
-          record => record.owner === owner
-        )
-
-        const labels = profileHistory.map(record =>
-          new Date(record.timestamp).toLocaleDateString()
-        )
-        const rankData = profileHistory.map(record => record.rank)
-        const uploadData = profileHistory.map(record =>
-          parseStorageValue(record.upload)
-        )
-        const currentUploadData = profileHistory.map(record =>
-          parseSpeedValue(record.current_upload)
-        )
-        const downloadData = profileHistory.map(record =>
-          parseSpeedValue(record.current_download)
-        )
-        const pointsData = profileHistory.map(record => record.points)
-
-        const seedingCount = profileHistory.map(record => record.seeding_count)
+        const labels = profileHistory.map(record => new Date(record.timestamp).toLocaleDateString());
+        const rankData = profileHistory.map(record => record.rank);
+        const uploadData = profileHistory.map(record => parseStorageValue(record.upload));
+        const pointsData = profileHistory.map(record => record.points);
+        const seedingCount = profileHistory.map(record => record.seeding_count);
 
         const chartData = {
           labels: labels,
           datasets: [
-            {
-              label: 'Rank',
-              data: rankData,
-              borderColor: 'rgba(255, 99, 132, 1)',
-              fill: false,
-            },
-            {
-              label: 'Total Uploaded (TB)',
-              data: uploadData,
-              borderColor: 'rgba(54, 162, 235, 1)',
-              fill: false,
-            },
-            {
-              label: 'Upload Speed (MiB/s)',
-              data: currentUploadData,
-              borderColor: 'rgba(255, 206, 86, 1)',
-              fill: false,
-            },
-            {
-              label: 'Download Speed (MiB/s)',
-              data: downloadData,
-              borderColor: 'rgba(75, 192, 192, 1)',
-              fill: false,
-            },
-            {
-              label: 'Points',
-              data: pointsData,
-              borderColor: 'rgba(153, 102, 255, 1)',
-              fill: false,
-            },
-            {
-              label: 'Seeding Count',
-              data: seedingCount,
-              borderColor: 'rgba(255, 159, 64, 1)',
-              fill: false,
-            },
+            { label: 'Rank', data: rankData, borderColor: 'rgba(255, 99, 132, 1)', fill: false },
+            { label: 'Total Uploaded (TB)', data: uploadData, borderColor: 'rgba(54, 162, 235, 1)', fill: false },
+            { label: 'Points', data: pointsData, borderColor: 'rgba(153, 102, 255, 1)', fill: false },
+            { label: 'Seeding Count', data: seedingCount, borderColor: 'rgba(255, 159, 64, 1)', fill: false },
           ],
-        }
+        };
 
         if (historyChart) {
-          historyChart.destroy()
+          historyChart.destroy();
         }
 
-        const ctx = document.getElementById('historyChart').getContext('2d')
-        historyChart = new Chart(ctx, {
-          type: 'line',
-          data: chartData,
-          options: {
-            responsive: true,
-            scales: {
-              x: {
-                title: {
-                  display: true,
-                  text: 'Date',
-                },
-              },
-              y: {
-                title: {
-                  display: true,
-                  text: 'Value',
-                },
-                beginAtZero: true,
-              },
-            },
-            plugins: {
-              tooltip: {
-                callbacks: {
-                  label: function (tooltipItem) {
-                    const label = tooltipItem.dataset.label || ''
-                    const value = tooltipItem.raw
-                    return `${label}: ${value}`
-                  },
-                },
-              },
-            },
-          },
-        })
+        const ctx = document.getElementById('historyChart').getContext('2d');
+        historyChart = new Chart(ctx, { type: 'line', data: chartData, options: { responsive: true } });
 
-        historyModal.classList.remove('hidden')
-        setTimeout(() => historyModal.classList.add('visible'), 10)
+        historyModal.classList.remove('hidden');
+        setTimeout(() => historyModal.classList.add('visible'), 10);
+      }
+
+      // Helper functions remain the same
+      function parseStorageValue(value) {
+        const numericValue = parseFloat(value);
+        if (value.includes('TiB')) return numericValue.toFixed(2);
+        if (value.includes('GiB')) return (numericValue / 1024).toFixed(2);
+        return numericValue.toFixed(2);
       }
 
       function closeModal() {
-        const historyModal = document.getElementById('historyModal')
-        historyModal.classList.remove('visible')
-        historyModal.classList.add('hidden')
+        const historyModal = document.getElementById('historyModal');
+        historyModal.classList.remove('visible');
+        historyModal.classList.add('hidden');
       }
 
-      fetchProfiles()
+      // Initial load
+      fetchProfiles();
     </script>
   </body>
 </html>

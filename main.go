@@ -1,9 +1,10 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -13,8 +14,8 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/fsnotify/fsnotify"
 	"github.com/joho/godotenv"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type ProfileData struct {
@@ -28,58 +29,232 @@ type ProfileData struct {
 	SeedingCount    int       `json:"seeding_count"`
 }
 
+type User struct {
+	ID          int
+	DisplayName string
+	ProfileID   string
+}
+
 var (
-	profiles     = map[string]string{}
-	jsonFile     = "./data/data.json"
-	profilesFile = "./data/profiles.json"
-	baseUrl      = "https://ncore.pro/profile.php?id="
-	nick         string
-	pass         string
-	client       *http.Client
+	db      *sql.DB
+	dbFile  = "./data/ncore_stats.db"
+	baseUrl = "https://ncore.pro/profile.php?id="
+	nick    string
+	pass    string
+	client  *http.Client
 )
 
-func init() {
+func profilesHandler(w http.ResponseWriter, r *http.Request) {
+	query := `
+	SELECT u.display_name, ph.timestamp, ph.rank, ph.upload, ph.current_upload, ph.current_download, ph.points, ph.seeding_count
+	FROM profile_history ph
+	INNER JOIN (
+		SELECT user_id, MAX(timestamp) as max_ts
+		FROM profile_history
+		GROUP BY user_id
+	) latest ON ph.user_id = latest.user_id AND ph.timestamp = latest.max_ts
+	JOIN users u ON ph.user_id = u.id;
+	`
+	rows, err := db.Query(query)
+	if err != nil {
+		http.Error(w, "Could not read latest profiles from database", http.StatusInternalServerError)
+		log.Printf("Error querying latest profiles: %v", err)
+		return
+	}
+	defer rows.Close()
+
+	var latestProfiles []ProfileData
+	for rows.Next() {
+		var p ProfileData
+		if err := rows.Scan(&p.Owner, &p.Timestamp, &p.Rank, &p.Upload, &p.CurrentUpload, &p.CurrentDownload, &p.Points, &p.SeedingCount); err != nil {
+			http.Error(w, "Could not process profile data", http.StatusInternalServerError)
+			log.Printf("Error scanning latest profile row: %v", err)
+			return
+		}
+		latestProfiles = append(latestProfiles, p)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(latestProfiles); err != nil {
+		log.Printf("Error encoding latest profiles to JSON: %v", err)
+	}
+}
+
+func historyHandler(w http.ResponseWriter, r *http.Request) {
+	owner := r.URL.Query().Get("owner")
+	if owner == "" {
+		http.Error(w, "Missing 'owner' query parameter", http.StatusBadRequest)
+		return
+	}
+
+	query := `
+		SELECT u.display_name, ph.timestamp, ph.rank, ph.upload, ph.current_upload, ph.current_download, ph.points, ph.seeding_count
+		FROM profile_history ph
+		JOIN users u ON ph.user_id = u.id
+		WHERE u.display_name = ?
+		ORDER BY ph.timestamp ASC
+	`
+	rows, err := db.Query(query, owner)
+	if err != nil {
+		http.Error(w, "Could not read history from database", http.StatusInternalServerError)
+		log.Printf("Error querying history for %s: %v", owner, err)
+		return
+	}
+	defer rows.Close()
+
+	var userHistory []ProfileData
+	for rows.Next() {
+		var p ProfileData
+		if err := rows.Scan(&p.Owner, &p.Timestamp, &p.Rank, &p.Upload, &p.CurrentUpload, &p.CurrentDownload, &p.Points, &p.SeedingCount); err != nil {
+			http.Error(w, "Could not process history data", http.StatusInternalServerError)
+			log.Printf("Error scanning history row for %s: %v", owner, err)
+			return
+		}
+		userHistory = append(userHistory, p)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(userHistory); err != nil {
+		log.Printf("Error encoding history for %s to JSON: %v", owner, err)
+	}
+}
+
+func main() {
+	// --- Environment and Initialization ---
 	_ = godotenv.Load(".env.local")
 	godotenv.Load()
-
 	nick = os.Getenv("NICK")
 	pass = os.Getenv("PASS")
 
-	if _, err := os.Stat(profilesFile); os.IsNotExist(err) {
-		log.Printf("File %s does not exist, creating an empty one", profilesFile)
-		err := os.WriteFile(profilesFile, []byte("{}"), 0644)
-		if err != nil {
-			log.Fatalf("Failed to create profiles file: %v", err)
-		}
+	// --- Ensure critical env vars are set ---
+	if nick == "" || pass == "" {
+		log.Fatal("FATAL: Critical environment variables NICK and/or PASS are not set. Please create a .env or .env.local file with these values.")
 	}
-
-	loadProfiles()
 
 	client = &http.Client{}
+
+	initDB()
+	defer db.Close()
+
+	// --- Command-line flags for user management ---
+	addUserFlag := flag.String("add-user", "", "Add a new user. Provide as 'DisplayName,ProfileID'")
+	flag.Parse()
+
+	if *addUserFlag != "" {
+		parts := strings.Split(*addUserFlag, ",")
+		if len(parts) != 2 {
+			log.Fatal("Invalid format for --add-user. Use 'DisplayName,ProfileID'")
+		}
+		addUser(parts[0], parts[1])
+		return // Exit after adding user
+	}
+
+	// --- Background task and Web Server ---
+	go func() {
+		fetchAndLogProfiles()
+		ticker := time.NewTicker(time.Hour * 24)
+		defer ticker.Stop()
+		for range ticker.C {
+			fetchAndLogProfiles()
+		}
+	}()
+
+	// --- Handler Registration ---
+	http.HandleFunc("/api/profiles", profilesHandler)
+	http.HandleFunc("/api/history", historyHandler)
+
+	http.HandleFunc("/", serveHTML)
+
+	log.Println("Server is starting on port 3000...")
+	log.Fatal(http.ListenAndServe(":3000", nil))
 }
 
-func loadProfiles() {
-	file, err := os.Open(profilesFile)
+func initDB() {
+	var err error
+	if err := os.MkdirAll("./data", 0755); err != nil {
+		log.Fatalf("Failed to create data directory: %v", err)
+	}
+	db, err = sql.Open("sqlite3", dbFile)
 	if err != nil {
-		log.Fatalf("Failed to open profiles file: %v", err)
+		log.Fatalf("Failed to open database: %v", err)
 	}
-	defer file.Close()
-
-	jsonBytes, err := io.ReadAll(file)
+	usersTableSQL := `CREATE TABLE IF NOT EXISTS users ("id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, "display_name" TEXT NOT NULL UNIQUE, "profile_id" TEXT NOT NULL);`
+	_, err = db.Exec(usersTableSQL)
 	if err != nil {
-		log.Fatalf("Failed to read profiles file: %v", err)
+		log.Fatalf("Failed to create users table: %v", err)
 	}
-
-	var tempProfiles map[string]string
-	err = json.Unmarshal(jsonBytes, &tempProfiles)
+	profileHistoryTableSQL := `CREATE TABLE IF NOT EXISTS profile_history ("id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, "user_id" INTEGER NOT NULL, "timestamp" DATETIME NOT NULL, "rank" INTEGER, "upload" TEXT, "current_upload" TEXT, "current_download" TEXT, "points" INTEGER, "seeding_count" INTEGER, FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);`
+	_, err = db.Exec(profileHistoryTableSQL)
 	if err != nil {
-		log.Fatalf("Failed to unmarshal profiles JSON: %v", err)
+		log.Fatalf("Failed to create profile_history table: %v", err)
 	}
+	log.Println("Database initialized successfully.")
+}
 
-	for k, v := range tempProfiles {
-		profiles[k] = baseUrl + v
+func addUser(displayName, profileID string) {
+	stmt, err := db.Prepare("INSERT INTO users(display_name, profile_id) VALUES(?, ?)")
+	if err != nil {
+		log.Fatalf("Failed to prepare statement for adding user: %v", err)
 	}
-	log.Println("Profiles loaded successfully.")
+	defer stmt.Close()
+	_, err = stmt.Exec(displayName, profileID)
+	if err != nil {
+		log.Fatalf("Failed to add user %s: %v", displayName, err)
+	}
+	log.Printf("User '%s' with profile ID '%s' added successfully.", displayName, profileID)
+}
+
+func getUsers() ([]User, error) {
+	rows, err := db.Query("SELECT id, display_name, profile_id FROM users")
+	if err != nil {
+		return nil, fmt.Errorf("error querying users: %v", err)
+	}
+	defer rows.Close()
+	var users []User
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(&u.ID, &u.DisplayName, &u.ProfileID); err != nil {
+			return nil, fmt.Errorf("error scanning user row: %v", err)
+		}
+		users = append(users, u)
+	}
+	return users, nil
+}
+
+func logToDB(profile *ProfileData, userID int) error {
+	stmt, err := db.Prepare(`INSERT INTO profile_history(user_id, timestamp, rank, upload, current_upload, current_download, points, seeding_count) VALUES(?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return fmt.Errorf("error preparing insert statement: %v", err)
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(userID, profile.Timestamp, profile.Rank, profile.Upload, profile.CurrentUpload, profile.CurrentDownload, profile.Points, profile.SeedingCount)
+	if err != nil {
+		return fmt.Errorf("error executing insert for %s: %v", profile.Owner, err)
+	}
+	log.Printf("Profile for %s logged successfully to database.", profile.Owner)
+	return nil
+}
+
+func fetchAndLogProfiles() {
+	users, err := getUsers()
+	if err != nil {
+		log.Printf("Could not get users to fetch: %v", err)
+		return
+	}
+	log.Printf("Starting profile fetch for %d user(s).", len(users))
+	for _, user := range users {
+		profileURL := baseUrl + user.ProfileID
+		profile, err := fetchProfile(profileURL, user.DisplayName)
+		if err != nil {
+			log.Printf("Error fetching profile for %s: %v", user.DisplayName, err)
+			continue
+		}
+		if err := logToDB(profile, user.ID); err != nil {
+			log.Printf("Error logging profile to DB for %s: %v", user.DisplayName, err)
+		}
+		time.Sleep(2 * time.Second)
+	}
+	log.Println("Profile fetch cycle complete.")
 }
 
 func fetchProfile(url string, displayName string) (*ProfileData, error) {
@@ -87,40 +262,25 @@ func fetchProfile(url string, displayName string) (*ProfileData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating request for %s: %v", displayName, err)
 	}
-
 	req.Header.Set("Cookie", fmt.Sprintf("nick=%s; pass=%s", nick, pass))
-
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching profile for %s: %v", displayName, err)
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch profile %s: received status %d", displayName, resp.StatusCode)
 	}
-
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing profile document for %s: %v", displayName, err)
 	}
-
-	profile := &ProfileData{
-		Owner:     displayName,
-		Timestamp: time.Now(),
-	}
-
+	profile := &ProfileData{Owner: displayName, Timestamp: time.Now()}
 	doc.Find(".userbox_tartalom_mini .profil_jobb_elso2").Each(func(i int, s *goquery.Selection) {
-		label := s.Text()
-		value := s.Next().Text()
-
+		label, value := s.Text(), s.Next().Text()
 		switch label {
 		case "Helyezés:":
-			value = strings.TrimSuffix(value, ".")
-			rank, err := strconv.Atoi(value)
-			if err == nil {
-				profile.Rank = rank
-			}
+			profile.Rank, _ = strconv.Atoi(strings.TrimSuffix(value, "."))
 		case "Feltöltés:":
 			profile.Upload = value
 		case "Aktuális feltöltés:":
@@ -128,165 +288,21 @@ func fetchProfile(url string, displayName string) (*ProfileData, error) {
 		case "Aktuális letöltés:":
 			profile.CurrentDownload = value
 		case "Pontok száma:":
-			points, err := strconv.Atoi(value)
-			if err == nil {
-				profile.Points = points
-			}
+			profile.Points, _ = strconv.Atoi(strings.ReplaceAll(value, " ", ""))
 		}
 	})
-
 	doc.Find(".lista_mini_fej").Each(func(i int, s *goquery.Selection) {
-		text := s.Text()
-		re := regexp.MustCompile(`\((\d+)\)`)
-		matches := re.FindStringSubmatch(text)
-		if len(matches) > 1 {
+		if matches := regexp.MustCompile(`\((\d+)\)`).FindStringSubmatch(s.Text()); len(matches) > 1 {
 			fmt.Sscanf(matches[1], "%d", &profile.SeedingCount)
 		}
 	})
-
 	return profile, nil
 }
 
-func readExistingProfiles() ([]ProfileData, error) {
-	if _, err := os.Stat(jsonFile); os.IsNotExist(err) {
-		log.Printf("File %s does not exist, returning an empty profile list.", jsonFile)
-		return []ProfileData{}, nil
-	}
-
-	file, err := os.Open(jsonFile)
-	if err != nil {
-		return nil, fmt.Errorf("error opening %s: %v", jsonFile, err)
-	}
-	defer file.Close()
-
-	var existingProfiles []ProfileData
-	byteValue, err := io.ReadAll(file)
-	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %v", jsonFile, err)
-	}
-
-	err = json.Unmarshal(byteValue, &existingProfiles)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshalling profile data: %v", err)
-	}
-	return existingProfiles, nil
-}
-
-func logToJSON(profile *ProfileData) error {
-	existingProfiles, err := readExistingProfiles()
-	if err != nil {
-		return err
-	}
-
-	existingProfiles = append(existingProfiles, *profile)
-
-	file, err := os.OpenFile(jsonFile, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return fmt.Errorf("error opening file for writing: %v", err)
-	}
-	defer file.Close()
-
-	enc := json.NewEncoder(file)
-	enc.SetIndent("", "  ")
-	err = enc.Encode(existingProfiles)
-	if err != nil {
-		return fmt.Errorf("error encoding JSON data: %v", err)
-	}
-	log.Printf("Profile for %s logged successfully.", profile.Owner)
-	return nil
-}
-
-func dataHandler(w http.ResponseWriter, r *http.Request) {
-	existingProfiles, err := readExistingProfiles()
-	if err != nil {
-		http.Error(w, "Could not read data", http.StatusInternalServerError)
-		log.Printf("Error reading profiles: %v", err)
+func serveHTML(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode(existingProfiles)
-	if err != nil {
-		log.Printf("Error encoding profiles to JSON: %v", err)
-	}
-}
-
-func serveHTML(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "index.html")
-}
-
-func watchProfilesFile() {
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		log.Fatalf("Error creating file watcher: %v", err)
-	}
-	defer watcher.Close()
-
-	err = watcher.Add(profilesFile)
-	if err != nil {
-		log.Fatalf("Error adding file to watcher: %v", err)
-	}
-
-	debounce := time.AfterFunc(0, func() {})
-
-	for {
-		select {
-		case event, ok := <-watcher.Events:
-			if !ok {
-				return
-			}
-			if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Create == fsnotify.Create {
-				log.Println("Profiles file changed, reloading profiles...")
-				debounce.Stop()
-				debounce = time.AfterFunc(500*time.Millisecond, func() {
-					loadProfiles()
-					for displayName, url := range profiles {
-						profile, err := fetchProfile(url, displayName)
-						if err != nil {
-							log.Printf("Error fetching profile for %s after file change: %v", displayName, err)
-							continue
-						}
-
-						if err := logToJSON(profile); err != nil {
-							log.Printf("Error logging profile for %s: %v", displayName, err)
-						}
-					}
-				})
-			}
-		case err, ok := <-watcher.Errors:
-			if !ok {
-				return
-			}
-			log.Printf("File watcher error: %v", err)
-		}
-	}
-}
-
-func main() {
-	ticker := time.NewTicker(time.Hour * 24)
-	defer ticker.Stop()
-
-	go func() {
-		for {
-			for displayName, url := range profiles {
-				profile, err := fetchProfile(url, displayName)
-				if err != nil {
-					log.Printf("Error fetching profile %s: %v", displayName, err)
-					continue
-				}
-
-				if err := logToJSON(profile); err != nil {
-					log.Printf("Error logging profile for %s: %v", displayName, err)
-				}
-			}
-			<-ticker.C
-		}
-	}()
-
-	go watchProfilesFile()
-
-	http.HandleFunc("/data", dataHandler)
-	http.HandleFunc("/", serveHTML)
-	log.Println("Server is starting on port 3000...")
-	log.Fatal(http.ListenAndServe(":3000", nil))
 }
