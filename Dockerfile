@@ -1,8 +1,13 @@
 FROM golang:alpine AS builder
+
+RUN apk add --no-cache gcc musl-dev
+
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
+
+ENV CGO_ENABLED=1
 RUN go build -o trackncore .
 
 FROM alpine:latest
