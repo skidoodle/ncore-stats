@@ -1,129 +1,400 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>nCore Profile Stats</title>
-    <script src="//cdn.tailwindcss.com"></script>
-    <script src="//unpkg.com/boxicons"></script>
-    <script src="//unpkg.com/chart.js"></script>
-    <style>
-      body { background-color: #121212; color: #efefef; font-family: 'Roboto', sans-serif; }
-      #historyModal { transition: opacity 0.3s ease-in-out; }
-      #historyModal.hidden { opacity: 0; pointer-events: none; }
-      #historyModal.visible { opacity: 1; }
-      #profiles { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; }
-      .profile-card { flex: 0 1 calc(100% - 2rem); max-width: 400px; background-color: #1f1f1f; color: #e5e5e5; }
-      .profile-card button { background-color: #3b3b3b; color: #ffffff; }
-      .profile-card button:hover { background-color: #5b5b5b; }
-      #historyModal .bg-gray-800 { background-color: #2c2c2c; color: #ffffff; overflow-y: auto; }
-      #historyModal button { background-color: #444444; }
-      #historyModal button:hover { background-color: #666666; }
-    </style>
-  </head>
-  <body class="p-8 flex flex-col items-center">
-    <h1 class="text-4xl mb-10 font-semibold text-gray-100 text-center">nCore Profile Stats</h1>
-    <div id="profiles" class="w-full max-w-7xl"></div>
-    <div id="historyModal" class="fixed inset-0 hidden bg-black bg-opacity-50 flex items-center justify-center z-50 mt-6">
-      <div class="bg-gray-800 rounded-lg p-8 w-11/12 max-w-3xl text-white shadow-lg relative">
-        <h2 class="text-2xl mb-6 font-semibold" id="modal-profile-name"></h2>
-        <canvas id="historyChart" height="250"></canvas>
-        <button class="mt-4 px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded" onclick="closeModal()">Close</button>
-        <button class="absolute top-2 right-2 text-white" onclick="closeModal()"><i class="bx bx-x text-2xl"></i></button>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>nCore Profile Stats :: Production</title>
+
+  <!-- Core Libraries -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-main: #0A0F14;
+      --text-primary: #E0E0E0;
+      --text-secondary: #8B949E;
+      --border-color: #30363d;
+      --accent-green: #28a745;
+      --accent-amber: #FFB800;
+      --accent-cyan: #00BFFF;
+      --accent-magenta: #FF0057;
+      --accent-hover: #1F2937;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-primary);
+      font-family: 'Fira Code', monospace;
+      overflow-x: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* CRT Monitor Effects */
+    body::before {
+      content: " ";
+      display: block;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+      z-index: 100;
+      pointer-events: none;
+      background-size: 100% 2px, 3px 100%;
+    }
+
+    body::after {
+      content: " ";
+      display: block;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 60%, rgba(0, 0, 0, 0.8));
+      z-index: 101;
+      pointer-events: none;
+    }
+
+    .text-glow {
+      text-shadow: 0 0 5px rgba(0, 255, 65, 0.5);
+    }
+
+    .header-cursor::after {
+      content: '_';
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink {
+      50% {
+        opacity: 0;
+      }
+    }
+
+    .action-btn {
+      background-color: transparent;
+      border: 1px solid var(--text-secondary);
+      color: var(--text-secondary);
+      transition: all 0.2s ease;
+    }
+
+    .action-btn:hover {
+      background-color: var(--accent-hover);
+      border-color: var(--text-primary);
+      color: var(--text-primary);
+    }
+
+    .loader-text::after {
+      content: '_';
+      animation: blink 1s step-end infinite;
+    }
+
+    /* Modal Styles */
+    .modal-container {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease-in-out;
+      backdrop-filter: blur(2px);
+    }
+
+    .modal-container.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-panel {
+      transform: scale(0.95);
+      transition: transform 0.2s ease-in-out;
+    }
+
+    .modal-container.visible .modal-panel {
+      transform: scale(1);
+    }
+  </style>
+</head>
+
+<body class="p-4 sm:p-8">
+  <header class="text-center mb-12">
+    <h1 class="text-3xl sm:text-4xl font-semibold text-glow text-green-400 header-cursor">nCore_Profile_Stats</h1>
+  </header>
+
+  <main class="container mx-auto">
+    <section class="w-full max-w-6xl mx-auto">
+      <div id="loader" class="flex justify-center items-center py-20" aria-live="polite"><span
+          class="text-2xl loader-text">INITIALIZING</span></div>
+      <div id="error-message" class="hidden text-center bg-red-900/50 border border-red-500 p-4" aria-live="polite">
+      </div>
+      <div id="profiles" class="hidden grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Profiles are injected here by JavaScript -->
+      </div>
+    </section>
+  </main>
+
+  <!-- History Modal -->
+  <div id="historyModal"
+    class="modal-container fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-80">
+    <div class="modal-panel relative w-full max-w-5xl flex flex-col bg-[#0A0F14] border border-[#30363d]"
+      style="height: calc(100% - 2rem); max-height: 800px;">
+      <div class="p-4 border-b border-b-gray-700 flex justify-between items-center flex-shrink-0">
+        <h2 class="text-xl font-semibold">History: <span id="modal-owner-name" class="text-glow text-green-400"></span>
+        </h2>
+        <button id="modal-close-btn" class="action-btn px-2 py-1" aria-label="Close modal">[X]</button>
+      </div>
+      <div id="modal-content" class="p-4 flex-grow relative flex items-center justify-center">
+        <div id="modal-loader" class="text-2xl loader-text">FETCHING DATA</div>
+        <div id="modal-message" class="hidden text-2xl loader-text"></div>
+        <div id="chartContainer" class="absolute inset-4 hidden"></div>
       </div>
     </div>
+  </div>
 
-    <script>
-      let historyChart;
-
-      // Fetches only the LATEST data for each profile for a fast initial load.
-      async function fetchProfiles() {
-        const response = await fetch('/api/profiles');
-        const latestRecords = await response.json();
-
-        const profilesDiv = document.getElementById('profiles');
-        profilesDiv.innerHTML = '';
-
-        for (const latestRecord of latestRecords) {
-          const profileCard = document.createElement('div');
-          profileCard.classList.add('profile-card', 'rounded-lg', 'shadow-lg', 'p-6', 'w-full', 'flex', 'flex-col', 'justify-between');
-
-          profileCard.innerHTML = `
-            <div>
-              <h2 class="text-2xl font-semibold mb-4"><i class='bx bxs-user text-2xl mr-2'></i>${latestRecord.owner}</h2>
-              <div class="space-y-2">
-                  <p><i class='bx bx-trophy mr-2'></i> Rank: ${latestRecord.rank}</p>
-                  <p><i class='bx bx-cloud-upload mr-2'></i> Upload: ${latestRecord.upload}</p>
-                  <p><i class='bx bx-upload mr-2'></i> Current Upload: ${latestRecord.current_upload}</p>
-                  <p><i class='bx bx-download mr-2'></i> Current Download: ${latestRecord.current_download}</p>
-                  <p><i class='bx bx-coin mr-2'></i> Points: ${latestRecord.points}</p>
-                  <p><i class='bx bx-folder mr-2'></i> Seeding Count: ${latestRecord.seeding_count}</p>
-              </div>
-            </div>
-            <button class="mt-6 px-4 py-2 text-white rounded" onclick="showHistory('${latestRecord.owner}', event)">View History</button>
-          `;
-          profilesDiv.appendChild(profileCard);
+  <script>
+    const app = {
+      config: {
+        api: {
+          profiles: '/api/profiles',
+          historyBase: '/api/history?owner='
+        },
+        messages: {
+          noProfiles: 'STATUS: NO_PROFILES_FOUND.',
+          noHistory: 'STATUS: NO_HISTORY_FOUND.',
+          fetchError: (status) => `ERR_NET_FETCH (${status})`,
+          fatalError: (msg) => `FATAL: ${msg}.`
         }
-      }
+      },
+      dom: {},
+      state: {
+        historyChart: null,
+        modalRequestID: 0,
+      },
 
-      // Fetches and displays the history for a SINGLE profile ON DEMAND.
-      async function showHistory(owner, event) {
-        event.stopPropagation();
-        const historyModal = document.getElementById('historyModal');
-        document.getElementById('modal-profile-name').innerText = `History for ${owner}`;
+      init() {
+        this.dom.loader = document.getElementById('loader');
+        this.dom.errorMessage = document.getElementById('error-message');
+        this.dom.profilesContainer = document.getElementById('profiles');
+        this.dom.historyModal = document.getElementById('historyModal');
+        this.dom.modalOwnerName = document.getElementById('modal-owner-name');
+        this.dom.modalCloseBtn = document.getElementById('modal-close-btn');
+        this.dom.modalLoader = document.getElementById('modal-loader');
+        this.dom.modalMessage = document.getElementById('modal-message');
+        this.dom.chartContainer = document.getElementById('chartContainer');
 
-        // Fetch history for this specific user from the new API endpoint
-        const response = await fetch(`/api/history?owner=${encodeURIComponent(owner)}`);
-        const profileHistory = await response.json();
+        this.addEventListeners();
+        this.fetchProfiles();
+      },
 
-        if (!profileHistory || profileHistory.length === 0) {
-            alert('No history data found for this user.');
+      addEventListeners() {
+        this.dom.profilesContainer.addEventListener('click', (e) => {
+          const button = e.target.closest('.view-history-btn');
+          if (button) this.showHistory(button.dataset.owner);
+        });
+        this.dom.modalCloseBtn.addEventListener('click', () => this.closeModal());
+        this.dom.historyModal.addEventListener('click', (e) => {
+          if (e.target === this.dom.historyModal) this.closeModal();
+        });
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && this.dom.historyModal.classList.contains('visible')) {
+            this.closeModal();
+          }
+        });
+        this.dom.historyModal.addEventListener('keydown', (e) => this.trapFocus(e));
+      },
+
+      async fetchProfiles() {
+        try {
+          const response = await fetch(this.config.api.profiles);
+          if (!response.ok) throw new Error(this.config.messages.fetchError(response.status));
+          const profiles = await response.json();
+
+          if (!profiles || profiles.length === 0) {
+            this.showError(this.config.messages.noProfiles);
             return;
+          }
+
+          const fragment = document.createDocumentFragment();
+          profiles.forEach(profile => {
+            const article = document.createElement('article');
+            article.className = "flex flex-col bg-opacity-20 bg-gray-700 border border-[#30363d] hover:border-gray-500 transition-colors duration-300";
+            article.innerHTML = `
+                            <div class="p-5 flex-grow">
+                                <h3 class="text-xl font-bold mb-4 text-glow text-green-400">> ${profile.owner}</h3>
+                                <div class="grid grid-cols-2 gap-x-4 text-sm">
+                                    <span class="text-gray-400"># Rank</span><span class="font-semibold text-green-400 text-right">${profile.rank}</span>
+                                    <span class="text-gray-400">^ Total Upload</span><span class="font-semibold text-green-400 text-right">${profile.upload}</span>
+                                    <span class="text-gray-400">+ Current Upload</span><span class="font-semibold text-green-400 text-right">${profile.current_upload}</span>
+                                    <span class="text-gray-400">- Current Download</span><span class="font-semibold text-green-400 text-right">${profile.current_download}</span>
+                                    <span class="text-gray-400">* Points</span><span class="font-semibold text-green-400 text-right">${profile.points.toLocaleString()}</span>
+                                    <span class="text-gray-400">~ Seeding</span><span class="font-semibold text-green-400 text-right">${profile.seeding_count} torrents</span>
+                                </div>
+                            </div>
+                            <div class="p-5 pt-2">
+                                <button data-owner="${profile.owner}" class="view-history-btn action-btn w-full py-2 font-semibold">VIEW_HISTORY</button>
+                            </div>`;
+            fragment.appendChild(article);
+          });
+          this.dom.profilesContainer.appendChild(fragment);
+          this.dom.profilesContainer.style.display = 'grid';
+          this.dom.loader.style.display = 'none';
+
+        } catch (e) {
+          this.showError(this.config.messages.fatalError(e.message));
+          console.error(e);
+        }
+      },
+
+      async showHistory(owner) {
+        this.state.modalRequestID++;
+        const currentRequestID = this.state.modalRequestID;
+
+        this.dom.modalOwnerName.textContent = owner;
+        this.dom.modalLoader.style.display = 'block';
+        this.dom.chartContainer.style.display = 'none';
+        this.dom.modalMessage.style.display = 'none';
+        this.dom.historyModal.classList.add('visible');
+        document.body.style.overflow = 'hidden';
+        this.dom.modalCloseBtn.focus();
+
+        try {
+          const response = await fetch(`${this.config.api.historyBase}${encodeURIComponent(owner)}`);
+          if (this.state.modalRequestID !== currentRequestID) return;
+          if (!response.ok) throw new Error(this.config.messages.fetchError(response.status));
+
+          const historyData = await response.json();
+          if (this.state.modalRequestID !== currentRequestID) return;
+
+          if (!historyData || historyData.length === 0) {
+            this.showModalMessage(this.config.messages.noHistory);
+          } else {
+            this.dom.modalLoader.style.display = 'none';
+            this.dom.chartContainer.style.display = 'block';
+            this.renderChart(historyData);
+          }
+        } catch (e) {
+          if (this.state.modalRequestID === currentRequestID) {
+            this.showModalMessage(this.config.messages.fatalError(e.message));
+            console.error(e);
+          }
+        }
+      },
+
+      renderChart(historyData) {
+        if (this.state.historyChart) {
+          this.state.historyChart.destroy();
         }
 
-        const labels = profileHistory.map(record => new Date(record.timestamp).toLocaleDateString());
-        const rankData = profileHistory.map(record => record.rank);
-        const uploadData = profileHistory.map(record => parseStorageValue(record.upload));
-        const pointsData = profileHistory.map(record => record.points);
-        const seedingCount = profileHistory.map(record => record.seeding_count);
+        this.dom.chartContainer.innerHTML = '<canvas tabindex="0"></canvas>';
+        const canvas = this.dom.chartContainer.querySelector('canvas');
+        if (!canvas) return;
 
-        const chartData = {
-          labels: labels,
-          datasets: [
-            { label: 'Rank', data: rankData, borderColor: 'rgba(255, 99, 132, 1)', fill: false },
-            { label: 'Total Uploaded (TB)', data: uploadData, borderColor: 'rgba(54, 162, 235, 1)', fill: false },
-            { label: 'Points', data: pointsData, borderColor: 'rgba(153, 102, 255, 1)', fill: false },
-            { label: 'Seeding Count', data: seedingCount, borderColor: 'rgba(255, 159, 64, 1)', fill: false },
-          ],
+        const parseUploadValue = (value) => {
+          if (typeof value !== 'string') return 0;
+          const num = parseFloat(value.replace(/,/g, '').replace(/TiB|GiB|MiB/i, '').trim());
+          if (isNaN(num)) return 0;
+          if (value.toLowerCase().includes('gib')) return num / 1024;
+          if (value.toLowerCase().includes('mib')) return num / 1024 / 1024;
+          return num;
         };
 
-        if (historyChart) {
-          historyChart.destroy();
+        const labels = historyData.map(r => new Date(r.timestamp).toLocaleDateString('en-CA'));
+        const rankData = historyData.map(r => r.rank);
+        const uploadData = historyData.map(r => parseUploadValue(r.upload));
+        const pointsData = historyData.map(r => r.points);
+        const seedingData = historyData.map(r => r.seeding_count);
+
+        const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim();
+        const gridColor = 'rgba(50, 50, 50, 0.5)';
+        const font = { family: "'Fira Code', monospace" };
+
+        const accentGreen = getComputedStyle(document.documentElement).getPropertyValue('--accent-green').trim();
+        const accentAmber = getComputedStyle(document.documentElement).getPropertyValue('--accent-amber').trim();
+        const accentCyan = getComputedStyle(document.documentElement).getPropertyValue('--accent-cyan').trim();
+        const accentMagenta = getComputedStyle(document.documentElement).getPropertyValue('--accent-magenta').trim();
+
+        this.state.historyChart = new Chart(canvas, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              { label: 'Rank', data: rankData, borderColor: accentMagenta, tension: 0.2, yAxisID: 'yRank', fill: false },
+              { label: 'Upload (TiB)', data: uploadData, borderColor: accentGreen, tension: 0.2, yAxisID: 'yUpload', fill: false },
+              { label: 'Points', data: pointsData, borderColor: accentAmber, tension: 0.2, yAxisID: 'yPoints', fill: false },
+              { label: 'Seeding', data: seedingData, borderColor: accentCyan, tension: 0.2, yAxisID: 'ySeeding', fill: false }
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+              x: { grid: { color: gridColor, borderDash: [2, 4] }, ticks: { color: textColor, font: font } },
+              yRank: { type: 'linear', position: 'left', reverse: true, title: { display: true, text: 'Rank', color: accentMagenta, font: font }, grid: { drawOnChartArea: false }, ticks: { color: accentMagenta, font: font } },
+              yUpload: { type: 'linear', position: 'left', title: { display: true, text: 'Upload (TiB)', color: accentGreen, font: font }, grid: { color: gridColor, borderDash: [2, 4] }, ticks: { color: accentGreen, font: font }, offset: true },
+              yPoints: { type: 'linear', position: 'right', title: { display: true, text: 'Points', color: accentAmber, font: font }, grid: { drawOnChartArea: false }, ticks: { color: accentAmber, font: font } },
+              ySeeding: { type: 'linear', position: 'right', title: { display: true, text: 'Seeding', color: accentCyan, font: font }, grid: { drawOnChartArea: false }, ticks: { color: accentCyan, font: font }, offset: true }
+            },
+            plugins: { legend: { labels: { color: textColor, font: font } }, tooltip: { backgroundColor: '#000', titleFont: font, bodyFont: font, padding: 10, cornerRadius: 0, borderColor: textColor, borderWidth: 1 } }
+          }
+        });
+      },
+
+      closeModal() {
+        this.state.modalRequestID++;
+        this.dom.historyModal.classList.remove('visible');
+        document.body.style.overflow = 'auto';
+        if (this.state.historyChart) {
+          this.state.historyChart.destroy();
+          this.state.historyChart = null;
         }
+      },
 
-        const ctx = document.getElementById('historyChart').getContext('2d');
-        historyChart = new Chart(ctx, { type: 'line', data: chartData, options: { responsive: true } });
+      showError(message) {
+        this.dom.loader.style.display = 'none';
+        this.dom.errorMessage.textContent = message;
+        this.dom.errorMessage.style.display = 'block';
+      },
 
-        historyModal.classList.remove('hidden');
-        setTimeout(() => historyModal.classList.add('visible'), 10);
+      showModalMessage(message) {
+        this.dom.modalLoader.style.display = 'none';
+        this.dom.chartContainer.style.display = 'none';
+        this.dom.modalMessage.textContent = message;
+        this.dom.modalMessage.style.display = 'block';
+      },
+
+      trapFocus(e) {
+        if (e.key !== 'Tab') return;
+
+        const focusableElements = this.dom.historyModal.querySelectorAll('button, [tabindex]:not([tabindex="-1"])');
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            lastElement.focus();
+            e.preventDefault();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            firstElement.focus();
+            e.preventDefault();
+          }
+        }
       }
+    };
 
-      // Helper functions remain the same
-      function parseStorageValue(value) {
-        const numericValue = parseFloat(value);
-        if (value.includes('TiB')) return numericValue.toFixed(2);
-        if (value.includes('GiB')) return (numericValue / 1024).toFixed(2);
-        return numericValue.toFixed(2);
-      }
+    document.addEventListener('DOMContentLoaded', () => app.init());
+  </script>
+</body>
 
-      function closeModal() {
-        const historyModal = document.getElementById('historyModal');
-        historyModal.classList.remove('visible');
-        historyModal.classList.add('hidden');
-      }
-
-      // Initial load
-      fetchProfiles();
-    </script>
-  </body>
 </html>
