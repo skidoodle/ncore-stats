@@ -70,15 +70,7 @@ A simple Go project to scrape and track profile statistics (rank, upload, downlo
 
 2.  **Add Users using Docker**
 
-    Before starting the service, or to add new users later, run the `--add-user` command inside a temporary container. This ensures the user is added to the database in your persistent volume.
-
-    ```bash
-    # Use 'docker compose run' to add users before starting
-    docker compose run --rm ncore-stats --add-user 'Alice,69'
-    docker compose run --rm ncore-stats --add-user 'Bob,420'
-    ```
-
-    If the container is already running, you can use `docker exec`:
+    When the container is already running, you can use `docker exec`:
     ```bash
     # The executable inside the container is named 'ncore-stats'
     docker exec ncore-stats ./ncore-stats --add-user 'Charlie,1337'

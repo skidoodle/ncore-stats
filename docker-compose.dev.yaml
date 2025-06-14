@@ -9,7 +9,7 @@ services:
       - data:/app/data
     environment:
       - NICK=${NICK}
-      - PASSWORD=${PASS}
+      - PASS=${PASS}
 
 volumes:
   data:

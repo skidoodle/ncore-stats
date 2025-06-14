@@ -3,3 +3,5 @@
 .docker-compose*
 Dockerfile
 *.md
+.env*
+data/
