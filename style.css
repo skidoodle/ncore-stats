@@ -1,0 +1,91 @@
+ :root {
+     --bg-main: #0A0F14;
+     --text-primary: #E0E0E0;
+     --text-secondary: #8B949E;
+     --border-color: #30363d;
+     --accent-green: #28a745;
+     --accent-amber: #FFB800;
+     --accent-cyan: #00BFFF;
+     --accent-magenta: #FF0057;
+     --accent-hover: #1F2937;
+}
+ html {
+     scroll-behavior: smooth;
+}
+ body {
+     background-color: var(--bg-main);
+     color: var(--text-primary);
+     font-family: 'Fira Code', monospace;
+     overflow-x: hidden;
+     user-select: none;
+     -webkit-user-select: none;
+}
+ body::before {
+     content: " ";
+     display: block;
+     position: fixed;
+     top: 0;
+     left: 0;
+     right: 0;
+     bottom: 0;
+     background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+     z-index: 100;
+     pointer-events: none;
+     background-size: 100% 2px, 3px 100%;
+}
+ body::after {
+     content: " ";
+     display: block;
+     position: fixed;
+     top: 0;
+     left: 0;
+     right: 0;
+     bottom: 0;
+     background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 60%, rgba(0, 0, 0, 0.8));
+     z-index: 101;
+     pointer-events: none;
+}
+ .text-glow {
+     text-shadow: 0 0 5px rgba(0, 255, 65, 0.5);
+}
+ .header-cursor::after {
+     content: '_';
+     animation: blink 1s step-end infinite;
+}
+ @keyframes blink {
+     50% {
+         opacity: 0;
+    }
+}
+ .action-btn {
+     background-color: transparent;
+     border: 1px solid var(--text-secondary);
+     color: var(--text-secondary);
+     transition: all 0.2s ease;
+}
+ .action-btn:hover {
+     background-color: var(--accent-hover);
+     border-color: var(--text-primary);
+     color: var(--text-primary);
+}
+ .loader-text::after {
+     content: '_';
+     animation: blink 1s step-end infinite;
+}
+ .modal-container {
+     opacity: 0;
+     pointer-events: none;
+     transition: opacity 0.2s ease-in-out;
+     backdrop-filter: blur(2px);
+}
+ .modal-container.visible {
+     opacity: 1;
+     pointer-events: auto;
+}
+ .modal-panel {
+     transform: scale(0.95);
+     transition: transform 0.2s ease-in-out;
+}
+ .modal-container.visible .modal-panel {
+     transform: scale(1);
+}

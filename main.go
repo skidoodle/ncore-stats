@@ -163,7 +163,24 @@ func main() {
 	http.HandleFunc("/api/profiles", profilesHandler)
 	http.HandleFunc("/api/history", historyHandler)
 
-	http.HandleFunc("/", serveHTML)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html")
+		http.ServeFile(w, r, "index.html")
+	})
+
+	http.HandleFunc("/style.css", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/css")
+		http.ServeFile(w, r, "style.css")
+	})
+
+	http.HandleFunc("/script.js", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/javascript")
+		http.ServeFile(w, r, "script.js")
+	})
 
 	log.Println("Server is starting on port 3000...")
 	log.Fatal(http.ListenAndServe(":3000", nil))
@@ -297,12 +314,4 @@ func fetchProfile(url string, displayName string) (*ProfileData, error) {
 		}
 	})
 	return profile, nil
-}
-
-func serveHTML(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
-	http.ServeFile(w, r, "index.html")
 }
