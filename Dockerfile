@@ -10,7 +10,7 @@ FROM alpine:3
 RUN apk add --no-cache ca-certificates
 WORKDIR /app
 COPY --from=builder /out/ncore-stats .
-COPY index.html style.css script.js ./
+COPY web ./web
 EXPOSE 3000
 
 CMD ["./ncore-stats"]

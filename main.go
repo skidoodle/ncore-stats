@@ -90,9 +90,7 @@ func main() {
 	router := http.NewServeMux()
 	router.HandleFunc("/api/profiles", state.profilesHandler)
 	router.HandleFunc("/api/history", state.historyHandler)
-	router.HandleFunc("/", serveStatic("index.html", "text/html"))
-	router.HandleFunc("/style.css", serveStatic("style.css", "text/css"))
-	router.HandleFunc("/script.js", serveStatic("script.js", "application/javascript"))
+	router.Handle("/", http.FileServer(http.Dir("web")))
 
 	server := &http.Server{
 		Addr:    config.ServerPort,
