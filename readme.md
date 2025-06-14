@@ -2,6 +2,8 @@
 
 A simple Go project to scrape and track profile statistics (rank, upload, download, points) on nCore, the largest Hungarian BitTorrent tracker. The stats are stored in a SQLite database and displayed on a basic web interface.
 
+![image](https://github.com/user-attachments/assets/1496548c-0bb4-4f50-aecd-ead79759ceb0)
+
 ## Features
 
 -   Scrapes and logs profile stats from nCore for multiple users.
