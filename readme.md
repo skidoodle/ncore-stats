@@ -64,8 +64,8 @@ A simple Go project to scrape and track profile statistics (rank, upload, downlo
         volumes:
           - ./data:/app/data
         environment:
-            - NICK=
-            - PASS=
+            - NICK=${NICK}
+            - PASS=${PASS}
     ```
 
 2.  **Add Users using Docker**
@@ -80,8 +80,8 @@ A simple Go project to scrape and track profile statistics (rank, upload, downlo
 
     If the container is already running, you can use `docker exec`:
     ```bash
-    # The executable inside the container is named 'trackncore'
-    docker exec ncore-stats ./trackncore --add-user 'Charlie,1337'
+    # The executable inside the container is named 'ncore-stats'
+    docker exec ncore-stats ./ncore-stats --add-user 'Charlie,1337'
     ```
 
 3.  **Run the Docker Compose setup:**
