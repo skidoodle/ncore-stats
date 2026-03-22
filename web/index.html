@@ -2,48 +2,97 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>nCore Profile Stats</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>nCore Stats</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" as="style"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <style>
+        [x-cloak] {
+            display: none !important;
+        }
+    </style>
 </head>
 
-<body class="p-4 sm:p-8">
-  <header class="text-center mb-12">
-    <h1 class="text-3xl sm:text-4xl font-semibold text-glow text-green-400 header-cursor">nCore_Profile_Stats</h1>
-  </header>
-  <main class="container mx-auto">
-    <section class="w-full max-w-6xl mx-auto">
-      <div id="loader" class="flex justify-center items-center py-20" aria-live="polite">
-        <span class="text-2xl loader-text">INITIALIZING</span>
-      </div>
-      <div id="error-message" class="hidden text-center bg-red-900/50 border border-red-500 p-4" aria-live="polite">
-      </div>
-      <div id="profiles" class="hidden grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
-    </section>
-  </main>
-  <div id="historyModal"
-    class="modal-container fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-80">
-    <div class="modal-panel relative w-full max-w-5xl flex flex-col bg-[#0A0F14] border border-[#30363d]"
-      style="height: calc(100% - 2rem); max-height: 800px;">
-      <div class="p-4 border-b border-b-gray-700 flex justify-between items-center flex-shrink-0">
-        <h2 class="text-xl font-semibold">History: <span id="modal-owner-name" class="text-glow text-green-400"></span>
-        </h2>
-        <button id="modal-close-btn" class="action-btn px-2 py-1" aria-label="Close modal">[X]</button>
-      </div>
-      <div id="modal-content" class="p-4 flex-grow relative flex items-center justify-center">
-        <div id="modal-loader" class="text-2xl loader-text">FETCHING DATA</div>
-        <div id="modal-message" class="hidden text-2xl loader-text"></div>
-        <div id="chartContainer" class="absolute inset-4 hidden"></div>
-      </div>
+<body x-data="{ modalOpen: false, modalOwner: '' }" :class="modalOpen ? 'overflow-hidden' : ''" x-cloak>
+    <div class="container">
+        <header>
+            <h1>nCore Stats</h1>
+        </header>
+
+        <main>
+            <div id="profiles" class="grid">
+                {{range .Profiles}}
+                <article class="card">
+                    <div class="card-header">
+                        <h3>{{.Owner}}</h3>
+                        <span class="rank-badge">RANK #{{.Rank}}</span>
+                    </div>
+
+                    <div class="stats-group">
+                        <div class="stat">
+                            <span class="stat-label">Total Upload</span>
+                            <span class="stat-value">{{.Upload}}</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Points</span>
+                            <span class="stat-value">{{.Points}}</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Up Speed</span>
+                            <span class="stat-value">{{if .CurrentUpload}}{{.CurrentUpload}}{{else}}0 B/s{{end}}</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Down Speed</span>
+                            <span class="stat-value">{{if .CurrentDownload}}{{.CurrentDownload}}{{else}}0
+                                B/s{{end}}</span>
+                        </div>
+                    </div>
+
+                    <button hx-get="/api/history-modal?owner={{.Owner}}" hx-target="#modal-stats-root"
+                        @click="modalOpen = true; modalOwner = '{{.Owner}}'" class="btn-view">
+                        View History
+                    </button>
+                </article>
+                {{else}}
+                <div
+                    style="grid-column: 1 / -1; padding: 4rem; text-align: center; color: var(--muted); border: 1px dashed var(--border-dim);">
+                    No profiles found. Use the CLI to add users.
+                </div>
+                {{end}}
+            </div>
+        </main>
     </div>
-  </div>
-  <script src="script.js"></script>
+
+    <template x-teleport="body">
+        <div x-show="modalOpen" class="modal-overlay" x-cloak @keydown.escape.window="modalOpen = false">
+            <div class="modal-panel" @click.away="modalOpen = false">
+                <div class="modal-header">
+                    <h2 x-text="'HISTORY: ' + modalOwner.toUpperCase()"></h2>
+                    <button @click="modalOpen = false" class="close-btn">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div id="modal-content" class="modal-body">
+                    <div id="modal-stats-root" style="flex: 1; min-height: 0;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script src="/static/script.js"></script>
 </body>
 
 </html>
