@@ -2,7 +2,7 @@
 
 A tracker for nCore profile statistics.
 
-![nCore Stats Dashboard](https://github.com/user-attachments/assets/1496548c-0bb4-4f50-aecd-ead79759ceb0)
+![nCore Stats Dashboard](https://github.com/user-attachments/assets/61fc64c6-c1ce-4d98-ade3-8a6ef3ee3f5e)
 
 ## Quick Start
 
