@@ -193,9 +193,9 @@ main {
 .modal-panel {
     background-color: var(--card-bg);
     border: 1px solid var(--border);
-    width: 90vw;
-    max-width: 1100px;
-    height: 75vh;
+    width: 95vw;
+    max-width: 1600px;
+    height: 90vh;
     display: flex;
     flex-direction: column;
     border-radius: 16px;

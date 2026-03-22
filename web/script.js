@@ -20,18 +20,19 @@ async function renderChart(owner) {
     }
     const parseUploadValue = (value) => {
       if (typeof value !== 'string') return 0;
-      const num = parseFloat(value.replace(/,/g, '').replace(/TiB|GiB|MiB/i, '').trim());
+      const num = parseFloat(value.replace(/,/g, '').replace(/TiB|GiB|MiB|KiB|B/i, '').trim());
       if (isNaN(num)) return 0;
       const lowerVal = value.toLowerCase();
       if (lowerVal.includes('tib')) return num;
       if (lowerVal.includes('gib')) return num / 1024;
       if (lowerVal.includes('mib')) return num / 1024 / 1024;
-      return num;
+      if (lowerVal.includes('kib')) return num / 1024 / 1024 / 1024;
+      return num / 1024 / 1024 / 1024 / 1024;
     };
 
     const series = [
       {
-        name: 'Upload (TiB)',
+        name: 'Upload',
         data: historyData.map(r => ({ x: new Date(r.timestamp).getTime(), y: parseUploadValue(r.upload) }))
       },
       {
@@ -62,6 +63,22 @@ async function renderChart(owner) {
         toolbar: { show: false },
         animations: { enabled: true, easing: 'easeinout', speed: 800 }
       },
+      responsive: [
+        {
+          breakpoint: 700,
+          options: {
+            yaxis: [
+              { show: false },
+              { show: false },
+              { show: false },
+              { show: false }
+            ],
+            grid: {
+              padding: { left: 0, right: 0 }
+            }
+          }
+        }
+      ],
       theme: { mode: 'dark' },
       colors: ['#FFFFFF', '#10b981', '#3b82f6', '#f43f5e'],
       stroke: {
@@ -87,10 +104,18 @@ async function renderChart(owner) {
       },
       yaxis: [
         {
-          seriesName: 'Upload (TiB)',
+          seriesName: 'Upload',
           labels: {
             style: { colors: '#FFF', fontSize: '11px', fontWeight: 600 },
             formatter: (v) => v != null ? v.toFixed(2) : ''
+          }
+        },
+        {
+          seriesName: 'Points',
+          opposite: false,
+          labels: {
+            style: { colors: '#3b82f6', fontSize: '11px', fontWeight: 600 },
+            formatter: (v) => v != null ? Math.round(v).toLocaleString() : ''
           }
         },
         {
@@ -103,12 +128,12 @@ async function renderChart(owner) {
           }
         },
         {
-          seriesName: 'Points',
-          show: false
-        },
-        {
           seriesName: 'Seeding',
-          show: false
+          opposite: true,
+          labels: {
+            style: { colors: '#f43f5e', fontSize: '11px', fontWeight: 600 },
+            formatter: (v) => v != null ? Math.round(v) : ''
+          }
         }
       ],
       legend: {

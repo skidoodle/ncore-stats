@@ -10,10 +10,12 @@ import (
 
 func initDB(cfg *Configuration) *sql.DB {
 	_ = os.MkdirAll(cfg.DatabasePath, 0755)
-	db, err := sql.Open("sqlite", fmt.Sprintf("%s/ncore_stats.db", cfg.DatabasePath))
+	db, err := sql.Open("sqlite", fmt.Sprintf("%s/ncore_stats.db?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)", cfg.DatabasePath))
 	if err != nil {
 		logrus.Fatalf("DB failed: %v", err)
 	}
+
+	db.SetMaxOpenConns(1)
 
 	schemas := []string{
 		`CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, display_name TEXT UNIQUE, profile_id TEXT);`,

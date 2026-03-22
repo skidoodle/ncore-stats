@@ -41,7 +41,10 @@ func (s *State) scrapeAll(ctx context.Context) {
 	var users []User
 	for rows.Next() {
 		var u User
-		rows.Scan(&u.ID, &u.DisplayName, &u.ProfileID)
+		if err := rows.Scan(&u.ID, &u.DisplayName, &u.ProfileID); err != nil {
+			logrus.Errorf("User scan failed: %v", err)
+			continue
+		}
 		users = append(users, u)
 	}
 
@@ -51,71 +54,88 @@ func (s *State) scrapeAll(ctx context.Context) {
 
 	logrus.Infof("Starting concurrent scrape for %d users", len(users))
 
+	sem := make(chan struct{}, 3)
 	var wg sync.WaitGroup
+
 	for _, u := range users {
-		wg.Add(1)
-		go func(user User) {
-			defer wg.Done()
+		select {
+		case <-ctx.Done():
+			logrus.Info("Scrape cycle cancelled by context")
+			return
+		case sem <- struct{}{}:
+			wg.Add(1)
+			go func(user User) {
+				defer wg.Done()
+				defer func() { <-sem }()
 
-			time.Sleep(time.Duration(100+(user.ID%500)) * time.Millisecond)
+				time.Sleep(time.Duration(200+(user.ID%1000)) * time.Millisecond)
 
-			profile, err := s.fetchProfile(user)
-			if err != nil {
-				logrus.Errorf("[%s] Fetch failed: %v", user.DisplayName, err)
-				return
-			}
+				profile, err := s.fetchProfile(ctx, user)
+				if err != nil {
+					logrus.Errorf("[%s] Fetch failed: %v", user.DisplayName, err)
+					return
+				}
 
-			_, err = s.db.Exec(`INSERT INTO profile_history(user_id, timestamp, rank, upload, current_upload, current_download, points, seeding_count) VALUES(?, ?, ?, ?, ?, ?, ?, ?)`,
-				user.ID, profile.Timestamp, profile.Rank, profile.Upload, profile.CurrentUpload, profile.CurrentDownload, profile.Points, profile.SeedingCount)
-			if err != nil {
-				logrus.Errorf("[%s] DB log failed: %v", user.DisplayName, err)
-			} else {
-				logrus.Infof("[%s] Metrics recorded", user.DisplayName)
-			}
-		}(u)
+				_, err = s.db.Exec(`INSERT INTO profile_history(user_id, timestamp, rank, upload, current_upload, current_download, points, seeding_count) VALUES(?, ?, ?, ?, ?, ?, ?, ?)`,
+					user.ID, profile.Timestamp, profile.Rank, profile.Upload, profile.CurrentUpload, profile.CurrentDownload, profile.Points, profile.SeedingCount)
+				if err != nil {
+					logrus.Errorf("[%s] DB log failed: %v", user.DisplayName, err)
+				} else {
+					logrus.Infof("[%s] Metrics recorded", user.DisplayName)
+				}
+			}(u)
+		}
 	}
 
 	wg.Wait()
 	logrus.Info("Scrape cycle complete")
 }
 
-func (s *State) fetchProfile(user User) (*ProfileData, error) {
-	req, _ := http.NewRequest("GET", ncoreBaseURL+user.ProfileID, nil)
+func (s *State) fetchProfile(ctx context.Context, user User) (*ProfileData, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", ncoreBaseURL+user.ProfileID, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
 	req.Header.Set("Cookie", fmt.Sprintf("nick=%s; pass=%s", s.config.Ncore.Nick, s.config.Ncore.Pass))
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("do request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("status %d", resp.StatusCode)
+		return nil, fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse document: %w", err)
 	}
 
 	p := &ProfileData{Owner: user.DisplayName, Timestamp: time.Now()}
+
 	doc.Find(".userbox_tartalom_mini .profil_jobb_elso2").Each(func(i int, sel *goquery.Selection) {
-		label, value := sel.Text(), sel.Next().Text()
-		switch label {
-		case "Helyezés:":
+		label := strings.ToLower(sel.Text())
+		value := strings.TrimSpace(sel.Next().Text())
+
+		if strings.Contains(label, "helyezés") { // Rank
 			p.Rank, _ = strconv.Atoi(strings.TrimSuffix(value, "."))
-		case "Feltöltés:":
+		} else if strings.Contains(label, "feltöltés") { // Upload
 			p.Upload = value
-		case "Pontok száma:":
+		} else if strings.Contains(label, "pontok") { // Points
 			p.Points, _ = strconv.Atoi(strings.ReplaceAll(value, " ", ""))
 		}
 	})
 
 	doc.Find(".lista_mini_fej").Each(func(i int, sel *goquery.Selection) {
 		text := sel.Text()
-		if m := regexp.MustCompile(`\((\d+)\)`).FindStringSubmatch(text); len(m) > 1 {
-			p.SeedingCount, _ = strconv.Atoi(m[1])
+		if strings.Contains(text, "seeding") || strings.Contains(text, "futó") {
+			if m := regexp.MustCompile(`\((\d+)\)`).FindStringSubmatch(text); len(m) > 1 {
+				p.SeedingCount, _ = strconv.Atoi(m[1])
+			}
 		}
+
 		if m := regexp.MustCompile(`fel: ([\d.]+ \w+/s)`).FindStringSubmatch(text); len(m) > 1 {
 			p.CurrentUpload = m[1]
 		}
