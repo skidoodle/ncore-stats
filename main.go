@@ -442,7 +442,12 @@ func (s *State) fetchProfile(user User) (*ProfileData, error) {
 		return nil, fmt.Errorf("error parsing profile document: %w", err)
 	}
 
-	profile := &ProfileData{Owner: user.DisplayName, Timestamp: time.Now()}
+	return parseProfileDoc(doc, user.DisplayName), nil
+}
+
+// parseProfileDoc extracts data from a profile document.
+func parseProfileDoc(doc *goquery.Document, displayName string) *ProfileData {
+	profile := &ProfileData{Owner: displayName, Timestamp: time.Now()}
 	doc.Find(".userbox_tartalom_mini .profil_jobb_elso2").Each(func(i int, s *goquery.Selection) {
 		label, value := s.Text(), s.Next().Text()
 		switch label {
@@ -460,10 +465,17 @@ func (s *State) fetchProfile(user User) (*ProfileData, error) {
 	})
 
 	doc.Find(".lista_mini_fej").Each(func(i int, s *goquery.Selection) {
-		if matches := regexp.MustCompile(`\((\d+)\)`).FindStringSubmatch(s.Text()); len(matches) > 1 {
+		text := s.Text()
+		if matches := regexp.MustCompile(`\((\d+)\)`).FindStringSubmatch(text); len(matches) > 1 {
 			fmt.Sscanf(matches[1], "%d", &profile.SeedingCount)
+		}
+		if matches := regexp.MustCompile(`le: ([\d.]+ \w+/s)`).FindStringSubmatch(text); len(matches) > 1 {
+			profile.CurrentDownload = matches[1]
+		}
+		if matches := regexp.MustCompile(`fel: ([\d.]+ \w+/s)`).FindStringSubmatch(text); len(matches) > 1 {
+			profile.CurrentUpload = matches[1]
 		}
 	})
 
-	return profile, nil
+	return profile
 }
