@@ -130,8 +130,8 @@ func (s *State) fetchProfile(ctx context.Context, user User) (*ProfileData, erro
 	})
 
 	doc.Find(".lista_mini_fej").Each(func(i int, sel *goquery.Selection) {
-		text := sel.Text()
-		if strings.Contains(text, "seeding") || strings.Contains(text, "futó") {
+		text := strings.ToLower(sel.Text())
+		if strings.Contains(text, "fel:") || strings.Contains(text, "le:") || strings.Contains(text, "seeding") || strings.Contains(text, "futó") {
 			if m := regexp.MustCompile(`\((\d+)\)`).FindStringSubmatch(text); len(m) > 1 {
 				p.SeedingCount, _ = strconv.Atoi(m[1])
 			}
