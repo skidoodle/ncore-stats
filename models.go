@@ -12,6 +12,7 @@ import (
 type Configuration struct {
 	ServerPort   string
 	DatabasePath string
+	UsersPath    string
 	LogLevel     logrus.Level
 	Ncore        struct {
 		Nick string

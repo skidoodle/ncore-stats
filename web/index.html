@@ -33,7 +33,7 @@
                 <article class="card">
                     <div class="card-header">
                         <h3>{{.Owner}}</h3>
-                        <span class="rank-badge">RANK #{{.Rank}}</span>
+                        <span class="rank-badge">#{{.Rank}}</span>
                     </div>
 
                     <div class="stats-group">
@@ -66,9 +66,8 @@
                     </button>
                 </article>
                 {{else}}
-                <div
-                    style="grid-column: 1 / -1; padding: 4rem; text-align: center; color: var(--muted); border: 1px dashed var(--border);">
-                    No profiles found. Use the CLI to add users.
+                <div class="empty-state">
+                    No profiles tracked. Mount users.txt to start.
                 </div>
                 {{end}}
             </div>

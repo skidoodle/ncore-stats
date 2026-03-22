@@ -94,6 +94,7 @@ func (s *State) historyModalHandler(w http.ResponseWriter, r *http.Request) {
 			 x-init='renderChart(%s)'>
 		</div>`, string(dataJSON))
 }
+
 func (s *State) rootHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)

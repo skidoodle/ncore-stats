@@ -34,6 +34,8 @@ func main() {
 		client: &http.Client{Timeout: 45 * time.Second},
 	}
 
+	state.syncUsers()
+
 	if handleFlags(state) {
 		return
 	}

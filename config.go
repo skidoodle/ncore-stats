@@ -31,6 +31,11 @@ func loadConfig() *Configuration {
 		cfg.DatabasePath = defaultDbFolder
 	}
 
+	cfg.UsersPath = os.Getenv("USERS_PATH")
+	if cfg.UsersPath == "" {
+		cfg.UsersPath = "./users.txt"
+	}
+
 	lvl, _ := logrus.ParseLevel(os.Getenv("LOG_LEVEL"))
 	if lvl == 0 {
 		lvl = logrus.InfoLevel

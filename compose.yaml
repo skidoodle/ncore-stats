@@ -3,13 +3,23 @@ services:
     image: ghcr.io/skidoodle/ncore-stats:latest
     container_name: ncore-stats
     restart: unless-stopped
+    user: "1000:1000"
     ports:
       - "3000:3000"
     volumes:
       - data:/app/data
+    configs:
+      - source: users_config
+        target: /app/users.txt
     environment:
       - NICK=${NICK}
-      - PASSWORD=${PASS}
+      - PASS=${PASS}
+
+configs:
+  users_config:
+    content: |
+      alice:123
+      bob:456
 
 volumes:
   data:
