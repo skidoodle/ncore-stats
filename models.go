@@ -25,6 +25,7 @@ type ProfileData struct {
 	Timestamp       time.Time `json:"timestamp"`
 	Rank            int       `json:"rank"`
 	Upload          string    `json:"upload"`
+	UploadBytes     int64     `json:"upload_bytes"`
 	CurrentUpload   string    `json:"current_upload"`
 	CurrentDownload string    `json:"current_download"`
 	Points          int       `json:"points"`
@@ -42,4 +43,14 @@ type State struct {
 	config *Configuration
 	db     *sql.DB
 	client *http.Client
+}
+
+// CompactHistory represents an optimized, columnar history format.
+type CompactHistory struct {
+	Owner     string    `json:"owner"`
+	Timestamp []int64   `json:"t"`
+	Rank      []int     `json:"r"`
+	Upload    []float64 `json:"u"`
+	Points    []int     `json:"p"`
+	Seeding   []int     `json:"s"`
 }

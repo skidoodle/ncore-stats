@@ -1,6 +1,6 @@
 services:
   ncore-stats:
-    image: ghcr.io/skidoodle/ncore-stats:main
+    image: ghcr.io/skidoodle/ncore-stats:latest
     container_name: ncore-stats
     restart: unless-stopped
     ports:
@@ -10,5 +10,6 @@ services:
     environment:
       - NICK=${NICK}
       - PASSWORD=${PASS}
+
 volumes:
   data:

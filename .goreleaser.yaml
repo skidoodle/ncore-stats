@@ -1,0 +1,67 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+snapshot:
+  version_template: "{{ .Version }}"
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+    flags:
+      - -trimpath
+
+archives:
+  - format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+
+dockers:
+  - image_templates:
+      - "ghcr.io/skidoodle/{{ .ProjectName }}:{{ .Tag }}-amd64"
+      - "ghcr.io/skidoodle/{{ .ProjectName }}:latest-amd64"
+    dockerfile: Dockerfile.release
+    use: buildx
+    goos: linux
+    goarch: amd64
+    extra_files:
+      - web/
+
+  - image_templates:
+      - "ghcr.io/skidoodle/{{ .ProjectName }}:{{ .Tag }}-arm64"
+      - "ghcr.io/skidoodle/{{ .ProjectName }}:latest-arm64"
+    dockerfile: Dockerfile.release
+    use: buildx
+    goos: linux
+    goarch: arm64
+    extra_files:
+      - web/
+
+docker_manifests:
+  - name_template: "ghcr.io/skidoodle/{{ .ProjectName }}:{{ .Tag }}"
+    image_templates:
+      - "ghcr.io/skidoodle/{{ .ProjectName }}:{{ .Tag }}-amd64"
+      - "ghcr.io/skidoodle/{{ .ProjectName }}:{{ .Tag }}-arm64"
+  - name_template: "ghcr.io/skidoodle/{{ .ProjectName }}:latest"
+    image_templates:
+      - "ghcr.io/skidoodle/{{ .ProjectName }}:latest-amd64"
+      - "ghcr.io/skidoodle/{{ .ProjectName }}:latest-arm64"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"

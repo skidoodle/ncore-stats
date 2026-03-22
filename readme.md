@@ -58,7 +58,7 @@ A simple Go project to scrape and track profile statistics (rank, upload, downlo
     ```yaml
     services:
       ncore-stats:
-        image: ghcr.io/skidoodle/ncore-stats:main
+        image: ghcr.io/skidoodle/ncore-stats:latest
         container_name: ncore-stats
         restart: unless-stopped
         ports:

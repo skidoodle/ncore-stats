@@ -6,50 +6,34 @@ const config = {
 
 let currentChart = null;
 
-async function renderChart(owner) {
+async function renderChart(data) {
   const root = document.getElementById('modal-stats-root');
-  if (!root) return;
+  if (!root || !data) return;
 
   try {
-    const response = await fetch(`${config.api.history}${encodeURIComponent(owner)}`); if (!response.ok) throw new Error('Network error');
-    const historyData = await response.json();
-
-    if (!historyData || historyData.length === 0) {
+    if (!data.t || data.t.length === 0) {
       root.innerHTML = '<p class="stat-label" style="text-align: center; padding: 2rem; color: var(--muted);">No history available.</p>';
       return;
     }
-    const parseUploadValue = (value) => {
-      if (typeof value !== 'string') return 0;
-      const num = parseFloat(value.replace(/,/g, '').replace(/TiB|GiB|MiB|KiB|B/i, '').trim());
-      if (isNaN(num)) return 0;
-      const lowerVal = value.toLowerCase();
-      if (lowerVal.includes('tib')) return num;
-      if (lowerVal.includes('gib')) return num / 1024;
-      if (lowerVal.includes('mib')) return num / 1024 / 1024;
-      if (lowerVal.includes('kib')) return num / 1024 / 1024 / 1024;
-      return num / 1024 / 1024 / 1024 / 1024;
-    };
 
     const series = [
       {
         name: 'Upload',
-        data: historyData.map(r => ({ x: new Date(r.timestamp).getTime(), y: parseUploadValue(r.upload) }))
+        data: data.t.map((ts, i) => ({ x: ts, y: data.u[i] }))
       },
       {
         name: 'Rank',
-        data: historyData.map(r => ({ x: new Date(r.timestamp).getTime(), y: r.rank }))
+        data: data.t.map((ts, i) => ({ x: ts, y: data.r[i] }))
       },
       {
         name: 'Points',
-        data: historyData.map(r => ({ x: new Date(r.timestamp).getTime(), y: r.points }))
+        data: data.t.map((ts, i) => ({ x: ts, y: data.p[i] }))
       },
       {
         name: 'Seeding',
-        data: historyData.map(r => ({ x: new Date(r.timestamp).getTime(), y: r.seeding_count }))
+        data: data.t.map((ts, i) => ({ x: ts, y: data.s[i] }))
       }
     ];
-
-    root.innerHTML = '<div id="chart-mount" style="height: 100%; width: 100%;"></div>';
 
     const options = {
       series: series,
@@ -61,7 +45,7 @@ async function renderChart(owner) {
         foreColor: '#71717a',
         fontFamily: 'Inter, system-ui, sans-serif',
         toolbar: { show: false },
-        animations: { enabled: true, easing: 'easeinout', speed: 800 }
+        animations: { enabled: false }
       },
       responsive: [
         {
@@ -166,6 +150,7 @@ async function renderChart(owner) {
     currentChart.render();
 
   } catch (e) {
+    console.error(e);
     root.innerHTML = `<div class="spinner-container"><p class="stat-label" style="color: #ef4444;">Error: ${e.message}</p></div>`;
   }
 }

@@ -76,8 +76,8 @@ func (s *State) scrapeAll(ctx context.Context) {
 					return
 				}
 
-				_, err = s.db.Exec(`INSERT INTO profile_history(user_id, timestamp, rank, upload, current_upload, current_download, points, seeding_count) VALUES(?, ?, ?, ?, ?, ?, ?, ?)`,
-					user.ID, profile.Timestamp, profile.Rank, profile.Upload, profile.CurrentUpload, profile.CurrentDownload, profile.Points, profile.SeedingCount)
+				_, err = s.db.Exec(`INSERT INTO profile_history(user_id, timestamp, rank, upload, upload_bytes, current_upload, current_download, points, seeding_count) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					user.ID, profile.Timestamp, profile.Rank, profile.Upload, profile.UploadBytes, profile.CurrentUpload, profile.CurrentDownload, profile.Points, profile.SeedingCount)
 				if err != nil {
 					logrus.Errorf("[%s] DB log failed: %v", user.DisplayName, err)
 				} else {
@@ -123,6 +123,7 @@ func (s *State) fetchProfile(ctx context.Context, user User) (*ProfileData, erro
 			p.Rank, _ = strconv.Atoi(strings.TrimSuffix(value, "."))
 		} else if strings.Contains(label, "feltöltés") { // Upload
 			p.Upload = value
+			p.UploadBytes = parseToBytes(value)
 		} else if strings.Contains(label, "pontok") { // Points
 			p.Points, _ = strconv.Atoi(strings.ReplaceAll(value, " ", ""))
 		}
@@ -145,4 +146,29 @@ func (s *State) fetchProfile(ctx context.Context, user User) (*ProfileData, erro
 	})
 
 	return p, nil
+}
+
+func parseToBytes(value string) int64 {
+	valStr := strings.ReplaceAll(value, ",", "")
+	parts := strings.Fields(valStr)
+	if len(parts) < 2 {
+		return 0
+	}
+	num, _ := strconv.ParseFloat(parts[0], 64)
+	unit := strings.ToLower(parts[1])
+
+	var multiplier float64
+	switch unit {
+	case "tib":
+		multiplier = 1024 * 1024 * 1024 * 1024
+	case "gib":
+		multiplier = 1024 * 1024 * 1024
+	case "mib":
+		multiplier = 1024 * 1024
+	case "kib":
+		multiplier = 1024
+	default:
+		multiplier = 1
+	}
+	return int64(num * multiplier)
 }
