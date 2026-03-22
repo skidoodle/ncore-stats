@@ -11,15 +11,13 @@ async function renderChart(owner) {
   if (!root) return;
 
   try {
-    const response = await fetch(`${config.api.history}${encodeURIComponent(owner)}`);
-    if (!response.ok) throw new Error('Network error');
+    const response = await fetch(`${config.api.history}${encodeURIComponent(owner)}`); if (!response.ok) throw new Error('Network error');
     const historyData = await response.json();
 
     if (!historyData || historyData.length === 0) {
-      root.innerHTML = '<div class="spinner-container"><p class="stat-label">No history available.</p></div>';
+      root.innerHTML = '<p class="stat-label" style="text-align: center; padding: 2rem; color: var(--muted);">No history available.</p>';
       return;
     }
-
     const parseUploadValue = (value) => {
       if (typeof value !== 'string') return 0;
       const num = parseFloat(value.replace(/,/g, '').replace(/TiB|GiB|MiB/i, '').trim());
@@ -33,7 +31,7 @@ async function renderChart(owner) {
 
     const series = [
       {
-        name: 'Upload',
+        name: 'Upload (TiB)',
         data: historyData.map(r => ({ x: new Date(r.timestamp).getTime(), y: parseUploadValue(r.upload) }))
       },
       {
@@ -59,21 +57,21 @@ async function renderChart(owner) {
         height: '100%',
         width: '100%',
         background: 'transparent',
-        foreColor: '#888',
+        foreColor: '#71717a',
         fontFamily: 'Inter, system-ui, sans-serif',
         toolbar: { show: false },
         animations: { enabled: true, easing: 'easeinout', speed: 800 }
       },
       theme: { mode: 'dark' },
-      colors: ['#FFFFFF', '#00FF00', '#0066FF', '#FF00FF'],
+      colors: ['#FFFFFF', '#10b981', '#3b82f6', '#f43f5e'],
       stroke: {
         curve: 'smooth',
         width: [3, 2, 2, 2],
         dashArray: 0
       },
       grid: {
-        borderColor: '#1a1a1a',
-        strokeDashArray: 0,
+        borderColor: '#27272a',
+        strokeDashArray: 4,
         padding: { top: 20, bottom: 0, left: 20, right: 20 },
         xaxis: { lines: { show: true } },
         yaxis: { lines: { show: true } }
@@ -89,9 +87,9 @@ async function renderChart(owner) {
       },
       yaxis: [
         {
-          seriesName: 'Upload',
+          seriesName: 'Upload (TiB)',
           labels: {
-            style: { colors: '#FFF', fontSize: '10px', fontWeight: 700 },
+            style: { colors: '#FFF', fontSize: '11px', fontWeight: 600 },
             formatter: (v) => v != null ? v.toFixed(2) : ''
           }
         },
@@ -100,7 +98,7 @@ async function renderChart(owner) {
           opposite: true,
           reversed: true,
           labels: {
-            style: { colors: '#00FF00', fontSize: '10px', fontWeight: 700 },
+            style: { colors: '#10b981', fontSize: '11px', fontWeight: 600 },
             formatter: (v) => v != null ? '#' + Math.round(v) : ''
           }
         },
@@ -115,9 +113,9 @@ async function renderChart(owner) {
       ],
       legend: {
         position: 'bottom',
-        fontSize: '14px',
+        fontSize: '12px',
         fontWeight: 600,
-        markers: { width: 10, height: 10, radius: 2 },
+        markers: { width: 8, height: 8, radius: 10 },
         itemMargin: { horizontal: 15, vertical: 10 }
       },
       tooltip: {
